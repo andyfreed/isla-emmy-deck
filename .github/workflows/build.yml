@@ -1,0 +1,51 @@
+name: build
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  GODOT_VERSION: "4.7-stable"
+  TEMPLATES_DIR: "4.7.stable"
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Godot + export templates
+        run: |
+          set -e
+          base="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}"
+          wget -q "${base}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+          wget -q "${base}/Godot_v${GODOT_VERSION}_export_templates.tpz"
+          unzip -q "Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+          mv "Godot_v${GODOT_VERSION}_linux.x86_64" godot
+          chmod +x godot
+          mkdir -p "$HOME/.local/share/godot/export_templates/${TEMPLATES_DIR}"
+          unzip -q "Godot_v${GODOT_VERSION}_export_templates.tpz"
+          mv templates/* "$HOME/.local/share/godot/export_templates/${TEMPLATES_DIR}/"
+
+      - name: Import resources
+        run: ./godot --headless --path . --import || true
+
+      - name: Export Linux build
+        run: |
+          mkdir -p build
+          ./godot --headless --path . --export-release "Linux" build/isla-emmy.x86_64
+          chmod +x build/isla-emmy.x86_64
+          ls -la build
+
+      - name: Publish "latest" release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest build
+          files: build/isla-emmy.x86_64
+          make_latest: true
+          body: "Auto-built Linux/Steam Deck binary. The on-Deck launcher pulls this automatically."
