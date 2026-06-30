@@ -1,19 +1,25 @@
 extends Node2D
-## Vertical slice: character select (Emmy / Isla) -> walk around, collect presents.
-## Built entirely in code so it stays robust and easy to extend. Gamepad-first
-## (Steam Deck): left stick / d-pad move, A confirms.
+## Vertical slice with the real art: character select (Emmy / Isla) -> walk the
+## island collecting presents. Gamepad-first (Steam Deck). Sprites are sized by
+## target on-screen height so any art drops in cleanly. Idle-bob + walk-squash
+## give the characters life from a single static drawing.
 
 const HEROES: Array[String] = ["isla", "emmy"]
+const SCREEN := Vector2(1280, 800)
+
+# play-area clamp (keep the kids on the island grass, below the HUD)
+const AREA_MIN := Vector2(150, 230)
+const AREA_MAX := Vector2(1130, 700)
 
 var state: String = "select"
 var sel: int = 0
 var ui: CanvasLayer
 var player: Node2D
+var player_base_scale: Vector2 = Vector2.ONE
 var presents: Array[Sprite2D] = []
 var score: int = 0
 var score_label: Label
-
-const SCREEN := Vector2(1280, 800)
+var anim_t: float = 0.0
 
 
 func _ready() -> void:
@@ -28,24 +34,21 @@ func show_select() -> void:
 	add_child(ui)
 
 	var bg := ColorRect.new()
-	bg.color = Color(0.45, 0.78, 0.95)
+	bg.color = Color(0.66, 0.85, 0.95)
 	bg.size = SCREEN
 	ui.add_child(bg)
 
-	var title := _label("ISLA & EMMY: FUNKY ISLANDS", 56, Vector2(0, 70), true)
-	ui.add_child(title)
-	ui.add_child(_label("Pick your hero   <  Left / Right  >   then  A", 28, Vector2(0, 180), true))
+	ui.add_child(_label("ISLA & EMMY: FUNKY ISLANDS", 56, Vector2(0, 56), true))
+	ui.add_child(_label("Pick your hero   <  Left / Right  >   then  A", 28, Vector2(0, 156), true))
 
 	for i in HEROES.size():
-		var h: String = HEROES[i]
 		var spr := Sprite2D.new()
-		spr.texture = load("res://assets/%s.png" % h)
-		spr.scale = Vector2(2.6, 2.6)
-		spr.position = Vector2(440 + i * 400, 440)
+		spr.texture = load("res://assets/%s.png" % HEROES[i])
+		spr.position = Vector2(440 + i * 400, 470)
 		spr.name = "portrait_%d" % i
 		ui.add_child(spr)
-		var nm := _label(h.to_upper(), 40, Vector2(440 + i * 400 - 120, 560), false)
-		nm.size = Vector2(240, 50)
+		var nm := _label(HEROES[i].to_upper(), 40, Vector2(440 + i * 400 - 140, 650), false)
+		nm.size = Vector2(280, 50)
 		nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		ui.add_child(nm)
 
@@ -56,8 +59,8 @@ func _update_cursor() -> void:
 	for i in HEROES.size():
 		var spr := ui.get_node("portrait_%d" % i) as Sprite2D
 		var on := i == sel
-		spr.modulate = Color(1, 1, 1) if on else Color(0.5, 0.5, 0.5, 0.85)
-		spr.scale = Vector2(3.1, 3.1) if on else Vector2(2.4, 2.4)
+		_fit_height(spr, 440.0 if on else 360.0)
+		spr.modulate = Color(1, 1, 1) if on else Color(0.7, 0.7, 0.7, 0.85)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -79,17 +82,24 @@ func start_game(hero: String) -> void:
 	Globals.hero = hero
 	ui.queue_free()
 
-	var bg := ColorRect.new()
-	bg.color = Color(0.36, 0.72, 0.45)
-	bg.size = SCREEN
+	var bg := Sprite2D.new()
+	bg.texture = load("res://assets/island_bg.png")
+	bg.position = SCREEN * 0.5
 	bg.z_index = -10
 	add_child(bg)
 
 	var hud := CanvasLayer.new()
 	add_child(hud)
-	score_label = _label("Presents: 0", 32, Vector2(30, 20), false)
+	score_label = _label("Presents: 0", 30, Vector2(30, 18), false)
 	hud.add_child(score_label)
-	hud.add_child(_label("Playing as " + hero.to_upper() + "   (B = change hero)", 24, Vector2(30, 62), false))
+	hud.add_child(_label("Playing as " + hero.to_upper() + "   (B = change hero)", 22, Vector2(30, 58), false))
+	# heart HUD (cosmetic preview of the health bar)
+	for h in 3:
+		var heart := Sprite2D.new()
+		heart.texture = load("res://assets/heart.png")
+		_fit_height(heart, 46.0)
+		heart.position = Vector2(1130 + h * 48, 40)
+		hud.add_child(heart)
 
 	player = Node2D.new()
 	player.position = SCREEN * 0.5
@@ -98,17 +108,17 @@ func start_game(hero: String) -> void:
 	var spr := Sprite2D.new()
 	spr.name = "spr"
 	spr.texture = load("res://assets/%s.png" % hero)
-	spr.scale = Vector2(1.6, 1.6)
+	player_base_scale = _fit_height(spr, 185.0)
 	player.add_child(spr)
 
 	var spots := [
-		Vector2(180, 170), Vector2(1090, 200), Vector2(300, 640),
-		Vector2(980, 630), Vector2(640, 150), Vector2(150, 430),
-		Vector2(1120, 470), Vector2(640, 670),
+		Vector2(250, 300), Vector2(1000, 320), Vector2(360, 600),
+		Vector2(930, 600), Vector2(640, 270), Vector2(640, 640),
 	]
 	for s in spots:
 		var p := Sprite2D.new()
 		p.texture = load("res://assets/present.png")
+		_fit_height(p, 78.0)
 		p.position = s
 		add_child(p)
 		presents.append(p)
@@ -118,28 +128,40 @@ func _process(delta: float) -> void:
 	if state != "play":
 		return
 
-	# back to character select
 	if Input.is_action_just_pressed("ui_cancel"):
 		_reset_to_select()
 		return
 
 	var dir := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
-	player.position += dir * 340.0 * delta
-	player.position.x = clampf(player.position.x, 40, SCREEN.x - 40)
-	player.position.y = clampf(player.position.y, 40, SCREEN.y - 40)
-	if dir.x != 0.0:
-		(player.get_node("spr") as Sprite2D).flip_h = dir.x < 0.0
+	var moving := dir.length() > 0.1
+	player.position += dir * 330.0 * delta
+	player.position.x = clampf(player.position.x, AREA_MIN.x, AREA_MAX.x)
+	player.position.y = clampf(player.position.y, AREA_MIN.y, AREA_MAX.y)
 
+	# --- juice: idle bob + walk squash on the single static sprite ---
+	anim_t += delta * (10.0 if moving else 2.5)
+	var s := sin(anim_t)
+	var spr := player.get_node("spr") as Sprite2D
+	if moving:
+		spr.position.y = -absf(s) * 13.0
+		spr.scale = player_base_scale * Vector2(1.0 - 0.05 * s, 1.0 + 0.05 * s)
+		if dir.x != 0.0:
+			spr.flip_h = dir.x < 0.0
+	else:
+		spr.position.y = -absf(s) * 3.0
+		spr.scale = player_base_scale * Vector2(1.0 + 0.03 * s, 1.0 - 0.03 * s)
+
+	# --- collect presents ---
 	var any_left := false
 	for p in presents:
-		if p.visible and player.position.distance_to(p.position) < 64.0:
+		if p.visible and player.position.distance_to(p.position) < 70.0:
 			p.visible = false
 			score += 1
 			score_label.text = "Presents: %d" % score
 		any_left = any_left or p.visible
 	if not any_left:
 		for p in presents:
-			p.visible = true   # endless, no-lose: they just keep coming back
+			p.visible = true
 
 
 func _reset_to_select() -> void:
@@ -152,11 +174,20 @@ func _reset_to_select() -> void:
 
 
 # ---------------------------------------------------------------- helpers
+func _fit_height(spr: Sprite2D, target_px: float) -> Vector2:
+	var h := spr.texture.get_height()
+	var s := target_px / float(h)
+	spr.scale = Vector2(s, s)
+	return spr.scale
+
+
 func _label(text: String, size: int, pos: Vector2, centered: bool) -> Label:
 	var l := Label.new()
 	l.text = text
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", Color(0.12, 0.12, 0.2))
+	l.add_theme_color_override("font_outline_color", Color(1, 1, 1, 0.7))
+	l.add_theme_constant_override("outline_size", 6)
 	l.position = pos
 	if centered:
 		l.size = Vector2(SCREEN.x, float(size) + 12.0)
