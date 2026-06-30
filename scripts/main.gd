@@ -194,6 +194,7 @@ func _enter_village(hero: String) -> void:
 	ground.polygon = island_poly
 	ground.texture = load("res://assets/home_island/grass.png")
 	ground.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+	ground.texture_scale = Vector2(2, 2)   # 1024 tile renders ~512px on screen
 	ground.z_index = -10
 	world.add_child(ground)
 
@@ -210,21 +211,21 @@ func _enter_village(hero: String) -> void:
 	for tp in [Vector2(950, 720), Vector2(2750, 680), Vector2(1300, 1230),
 			Vector2(2300, 1360), Vector2(820, 1300), Vector2(2950, 1180),
 			Vector2(1520, 640), Vector2(2150, 860)]:
-		world.add_child(_make_sprite("res://assets/home_island/tree.png", tp, 160.0))
+		world.add_child(_make_sprite("res://assets/home_island/tree.png", tp, 330.0))
 	for bp in [Vector2(700, 980), Vector2(2600, 1480), Vector2(1150, 1520), Vector2(2880, 880)]:
-		world.add_child(_make_sprite("res://assets/home_island/bush.png", bp, 90.0))
+		world.add_child(_make_sprite("res://assets/home_island/bush.png", bp, 120.0))
 	for rp in [Vector2(1650, 1430), Vector2(2450, 760), Vector2(1000, 600)]:
-		world.add_child(_make_sprite("res://assets/home_island/rock.png", rp, 78.0))
-	world.add_child(_make_sprite("res://assets/home_island/well.png", Vector2(1500, 1100), 130.0))
-	world.add_child(_make_sprite("res://assets/home_island/signpost.png", Vector2(1950, 1380), 110.0))
+		world.add_child(_make_sprite("res://assets/home_island/rock.png", rp, 95.0))
+	world.add_child(_make_sprite("res://assets/home_island/well.png", Vector2(1500, 1100), 150.0))
+	world.add_child(_make_sprite("res://assets/home_island/signpost.png", Vector2(1950, 1380), 140.0))
 
-	world.add_child(_make_sprite("res://assets/home_island/store.png", store_pos, 210.0))
-	world.add_child(_make_sprite("res://assets/home_island/balloon_station.png", balloon_pos, 280.0))
+	world.add_child(_make_sprite("res://assets/home_island/store.png", store_pos, 440.0))
+	world.add_child(_make_sprite("res://assets/home_island/balloon_station.png", balloon_pos, 520.0))
 
 	player = Node2D.new()
 	player.position = spawn_pos
 	world.add_child(player)
-	var spr := _make_sprite("res://assets/%s.png" % hero, Vector2.ZERO, 175.0)
+	var spr := _make_sprite("res://assets/%s.png" % hero, Vector2.ZERO, 170.0)
 	spr.name = "spr"
 	player_base_scale = spr.scale
 	player.add_child(spr)

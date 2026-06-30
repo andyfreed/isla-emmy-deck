@@ -13,6 +13,36 @@ to extend (new area = new `assets/<area>/` folder).
 | Enemies | `assets/enemies/` (e.g. grumpy.png; more to come) |
 | Steam store art (NOT in game) | `steam/` (capsule, banner, icon, logo) |
 
+## Scale & proportions (the #1 thing)
+- **Target resolution:** 1280×800 (16:10, Steam Deck). Backgrounds / full-screen UI to this.
+- **Ground tiles** render **~512px on screen** (~2.5 across the width). Source 1024² is
+  perfect — engine displays at half. Draw grass/path detail to read at that size.
+- **Proportion reference = the SISTER (≈170px tall on screen = 1.0 unit).** Keep
+  everything proportional to her:
+
+  | Object | × sister | ≈ px on screen |
+  |---|---|---|
+  | Sister (Isla/Emmy) | 1.0 | 170 |
+  | Enemy (overworld) | ~1.6 | 270 |
+  | Tree | ~1.95 | 330 |
+  | Store (building) | ~2.6 | 440 |
+  | Balloon station | ~3.0 | 520 |
+  | Bush | ~0.7 | 120 |
+  | Rock | ~0.55 | 95 |
+  | Well | ~0.9 | 150 |
+  | Signpost | ~0.8 | 140 |
+  | Lamp | ~1.2 | 200 |
+  | Market stall | ~1.4 | 240 |
+  | Barrel | ~0.6 | 100 |
+  | Flowerbed | ~0.5 | 85 |
+  | Fence (1 segment) | ~0.7 tall | 120 |
+
+  The engine sets each object's final height to these values, so exact source
+  canvas size doesn't matter (assets are autocropped + scaled) — keep the
+  **proportions** in this ballpark. Generate big things (store/balloon) at higher
+  res (~1536) to stay crisp. Battle view reuses the same sprites scaled up — no
+  separate battle art needed.
+
 ## Conventions (implemented in engine)
 - **Ground tiles** = opaque, seamless/tileable 1024×1024, flat top-down; used as a
   repeating texture fill for the island.
