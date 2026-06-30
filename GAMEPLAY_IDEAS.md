@@ -114,5 +114,24 @@ set). NOT the gritty Mewgenics end. Isla = blonde + pink overalls; Emmy = brunet
 
 ---
 
+## Locked decisions (so far)
+- Travel between islands = **hot-air balloon** (world map). LOCKED.
+- **Audio:** music = **Suno** (free tier ok, paid fine if needed); SFX = **ElevenLabs**
+  (text-to-SFX; has official MCP). LOCKED — start tomorrow.
+- Combat = losable **Funk-Off** battles, FF-style separate view (prototype built).
+- Party = FF model, both sisters; Isla=Rat/Squeeze, Emmy=Monkey/Climb.
+- Art = soft storybook (locked sample set in assets/).
+- Audience = geared 9+.
+
+## Next session (TODO)
+1. **Audio:** write AUDIO_BRIEF.md (Suno music prompts: island/battle/victory;
+   ElevenLabs SFX: pickup, funk-blast, win, menu). Generate + wire in (looping).
+2. **World map + balloon travel** between islands (per LORE.md map).
+3. **Zodiac shrines + collection** on islands; wire battles into real encounters
+   (replace the test-menu trigger).
+4. Tune battle difficulty/rhythm after playtesting.
+5. Nail lore with the girls (island names, the grumpy creatures, what scattered
+   the Spirits) — see LORE.md open questions.
+
 ## Other ideas
 (add here as they come)
