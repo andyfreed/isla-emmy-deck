@@ -52,7 +52,7 @@ func _ready() -> void:
 	ui.add_child(msg)
 
 	enemy = _make_combatant("Grumblehoof", enemy_sign, 70, false,
-		"res://assets/grumpy.png", Vector2(390, 360), 300.0, false)
+		"res://assets/enemies/grumpy.png", Vector2(390, 360), 300.0, false)
 	_make_bar(enemy, Vector2(255, 150), 250)
 	ui.add_child(_label("GRUMBLEHOOF", 22, Vector2(255, 118), false))
 

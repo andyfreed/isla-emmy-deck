@@ -192,7 +192,7 @@ func _enter_village(hero: String) -> void:
 
 	var ground := Polygon2D.new()
 	ground.polygon = island_poly
-	ground.texture = load("res://assets/grass.png")
+	ground.texture = load("res://assets/home_island/grass.png")
 	ground.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 	ground.z_index = -10
 	world.add_child(ground)
@@ -210,31 +210,17 @@ func _enter_village(hero: String) -> void:
 	for tp in [Vector2(950, 720), Vector2(2750, 680), Vector2(1300, 1230),
 			Vector2(2300, 1360), Vector2(820, 1300), Vector2(2950, 1180),
 			Vector2(1520, 640), Vector2(2150, 860)]:
-		var tree := Sprite2D.new()
-		tree.texture = load("res://assets/tree.png")
-		_fit_height(tree, 150.0)
-		tree.position = tp
-		world.add_child(tree)
+		world.add_child(_make_sprite("res://assets/home_island/tree.png", tp, 150.0))
 
-	var store := Sprite2D.new()
-	store.texture = load("res://assets/store.png")
-	_fit_height(store, 210.0)
-	store.position = store_pos
-	world.add_child(store)
-
-	var balloon := Sprite2D.new()
-	balloon.texture = load("res://assets/balloon_station.png")
-	_fit_height(balloon, 280.0)
-	balloon.position = balloon_pos
-	world.add_child(balloon)
+	world.add_child(_make_sprite("res://assets/home_island/store.png", store_pos, 210.0))
+	world.add_child(_make_sprite("res://assets/home_island/balloon_station.png", balloon_pos, 280.0))
 
 	player = Node2D.new()
 	player.position = spawn_pos
 	world.add_child(player)
-	var spr := Sprite2D.new()
+	var spr := _make_sprite("res://assets/%s.png" % hero, Vector2.ZERO, 175.0)
 	spr.name = "spr"
-	spr.texture = load("res://assets/%s.png" % hero)
-	player_base_scale = _fit_height(spr, 175.0)
+	player_base_scale = spr.scale
 	player.add_child(spr)
 
 	camera = Camera2D.new()
@@ -468,6 +454,23 @@ func _fit_height(spr: Sprite2D, target_px: float) -> Vector2:
 	var sc := target_px / float(h)
 	spr.scale = Vector2(sc, sc)
 	return spr.scale
+
+
+## Anchored world sprite per the art manifest: bottom-center pivot (baked base
+## shadow sits on the ground), scaled to a target on-screen height. Place at the
+## ground-contact point; Y-sort then handles front/behind overlap. flip_h still
+## mirrors cleanly because the rect stays horizontally centered on the origin.
+func _make_sprite(path: String, world_pos: Vector2, height: float) -> Sprite2D:
+	var s := Sprite2D.new()
+	s.texture = load(path)
+	s.centered = false
+	var tw := float(s.texture.get_width())
+	var th := float(s.texture.get_height())
+	var sc := height / th
+	s.scale = Vector2(sc, sc)
+	s.offset = Vector2(-tw / 2.0, -th)
+	s.position = world_pos
+	return s
 
 
 func _label(text: String, size: int, pos: Vector2, centered: bool) -> Label:
