@@ -53,11 +53,34 @@ the other **follows and fully participates**.
   inside a single-player game.)
 - Each sister starts with her signature sign; the party collects all 12 through play.
 
-**OPEN FORK — combat or not?** User referenced "fights" (FF framing). Decide:
-- (a) No-combat: "fights" = friendly co-op challenges/events, no game-over (matches
-  original kid-friendly design).
-- (b) Gentle FF-style turn-based battles: both sisters take turns w/ zodiac powers,
-  soft & un-scary (enemies give up / turn friendly, nobody gets hurt).
+**COMBAT — DECIDED: gentle turn-based battles (b).** Both sisters take turns using
+zodiac powers. Soft & un-scary: enemies are grumpy/sad creatures you cheer up or
+calm until they turn happy and leave/join — no death, no game-over. If the party
+runs out of hearts, they sit down dizzy and pop back.
+
+### Zodiac powers do DOUBLE DUTY (field power + battle special)
+Each collected sign is both an exploration tool AND a battle move. More signs =
+more ways to explore + bigger battle kit.
+
+| Sign | Field power | Battle special |
+|---|---|---|
+| Rat 쥐 (Isla start) | Squeeze | Nibble Flurry — fast multi-hit |
+| Ox 소 | Strong | Big Bump — one heavy shove |
+| Tiger 호랑이 | Pounce | Brave Roar — party attack-up |
+| Rabbit 토끼 | Hop | Hop Stomp — bonk + dodge next hit |
+| Dragon 용 | Glide | Sparkle Breath — flashy hit-all (ultimate) |
+| Snake 뱀 | Slither | Calm Hiss — pacify a grumpy enemy |
+| Horse 말 | Gallop | Gallop Charge — hit + extra turn |
+| Sheep 양 | Fluff | Fluffy Hug — heal/shield party |
+| Monkey 원숭이 (Emmy start) | Climb | Silly Dance — enemy skips a turn |
+| Rooster 닭 | Wake-Up | Wake-Up Crow — revive/un-dizzy a sister |
+| Dog 개 | Sniff | Loyal Guard — puppy shields a sister |
+| Pig 돼지 | Lucky | Lucky Feast — big party heal |
+
+### Art style — LOCKED
+Soft storybook: sketchy ink outlines + watercolor texture (per the approved sample
+set). NOT the gritty Mewgenics end. Isla = blonde + pink overalls; Emmy = brunette
++ teal. Collectibles/heart have cute eyes ("everything's a little alive").
 
 ### Open questions
 - Equip 1 active at a time, or a small loadout (2)?
