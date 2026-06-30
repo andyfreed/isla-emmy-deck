@@ -1,27 +1,39 @@
 extends Node2D
-## Overworld + character select. Pick Emmy/Isla, walk the island collecting
-## presents, walk into the grumpy creature (or use the Start test menu) to enter
-## an FF-style Funk-Off battle. Gamepad-first (Steam Deck) with touch fallbacks.
+## Character select + scrolling HOME VILLAGE hub. Organic island (~7 screens) with
+## a follow-camera, boundary collision, a general store and a hot-air-balloon launch
+## station you can walk up to, depth-sorted trees. Start menu (Resume/Test Battle/
+## Quit) and FF-style Funk-Off battles. Gamepad-first (Steam Deck) + touch.
 
 const HEROES: Array[String] = ["isla", "emmy"]
 const SCREEN := Vector2(1280, 800)
-const AREA_MIN := Vector2(150, 230)
-const AREA_MAX := Vector2(1130, 700)
+const WORLD := Vector2(3600, 2000)
 const BATTLE := preload("res://battle.tscn")
+const SPEED := 340.0
 
 var state: String = "select"        # select / play / battle
 var sel: int = 0
 var ui: CanvasLayer
+
+# village
+var world: Node2D
+var camera: Camera2D
 var player: Node2D
 var player_base_scale: Vector2 = Vector2.ONE
-var presents: Array[Sprite2D] = []
-var creature: Sprite2D
-var score: int = 0
-var score_label: Label
 var anim_t: float = 0.0
-var encounter_cd: float = 0.0
+var island_poly: PackedVector2Array
+var spawn_pos := Vector2(1750, 1500)
+var store_pos := Vector2(2560, 980)
+var balloon_pos := Vector2(1820, 470)
+var interact_target: String = ""
 
-# battle transition
+# hud
+var hud: CanvasLayer
+var prompt_label: Label
+var popup_label: Label
+var popup_t: float = 0.0
+
+# battle / transition
+var creature: Sprite2D
 var battle_node: Node
 var flash_layer: CanvasLayer
 var flash_rect: ColorRect
@@ -80,115 +92,147 @@ func _update_cursor() -> void:
 
 
 # ---------------------------------------------------------------- input
-func _input(event: InputEvent) -> void:
-	# Open/close the test menu with Start (☰) or Back (⧉) or Escape.
-	var menu_btn := false
-	if event is InputEventJoypadButton and (event as InputEventJoypadButton).pressed:
-		var bi := (event as InputEventJoypadButton).button_index
-		if bi == JOY_BUTTON_START or bi == JOY_BUTTON_BACK:
-			menu_btn = true
-	elif event is InputEventKey and (event as InputEventKey).pressed \
-			and (event as InputEventKey).keycode == KEY_ESCAPE:
-		menu_btn = true
-	if menu_btn and state != "battle":
-		_toggle_menu()
-		return
-
-	if menu_open:
-		if _confirm_pressed(event):
-			_menu_select()
-		return
-
-	# gamepad face buttons handled directly (Deck-robust)
+func _event_is_menu(event: InputEvent) -> bool:
 	if event is InputEventJoypadButton and (event as InputEventJoypadButton).pressed:
 		var b := (event as InputEventJoypadButton).button_index
-		if state == "select" and b == JOY_BUTTON_A:
-			start_game(HEROES[sel]); return
-		if state == "play" and b == JOY_BUTTON_B:
-			_reset_to_select(); return
-
-	if state != "select":
-		return
-
-	# touch/click to pick a hero (left = Isla, right = Emmy)
-	var pos := Vector2.INF
-	if event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed:
-		pos = (event as InputEventScreenTouch).position
-	elif event is InputEventMouseButton and (event as InputEventMouseButton).pressed and \
-			(event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
-		pos = (event as InputEventMouseButton).position
-	if pos != Vector2.INF:
-		sel = 0 if pos.x < SCREEN.x * 0.5 else 1
-		_update_cursor()
-		start_game(HEROES[sel])
-
-
-func _confirm_pressed(event: InputEvent) -> bool:
-	if event is InputEventJoypadButton and (event as InputEventJoypadButton).pressed \
-			and (event as InputEventJoypadButton).button_index == JOY_BUTTON_A:
-		return true
-	if event.is_action_pressed("ui_accept"):
-		return true
-	if event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed:
-		return true
-	if event is InputEventMouseButton and (event as InputEventMouseButton).pressed \
-			and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
+		return b == JOY_BUTTON_START or b == JOY_BUTTON_BACK
+	if event is InputEventKey and (event as InputEventKey).pressed \
+			and (event as InputEventKey).keycode == KEY_ESCAPE:
 		return true
 	return false
 
 
-# ---------------------------------------------------------------- world
+func _a_pressed(event: InputEvent) -> bool:
+	if event is InputEventJoypadButton and (event as InputEventJoypadButton).pressed \
+			and (event as InputEventJoypadButton).button_index == JOY_BUTTON_A:
+		return true
+	return event.is_action_pressed("ui_accept")
+
+
+func _pointer_pos(event: InputEvent) -> Vector2:
+	if event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed:
+		return (event as InputEventScreenTouch).position
+	if event is InputEventMouseButton and (event as InputEventMouseButton).pressed \
+			and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
+		return (event as InputEventMouseButton).position
+	return Vector2(-1, -1)
+
+
+func _input(event: InputEvent) -> void:
+	if _event_is_menu(event) and state != "battle":
+		_toggle_menu()
+		return
+	if menu_open:
+		if _a_pressed(event) or _pointer_pos(event).x >= 0.0:
+			_menu_select()
+		return
+
+	if state == "select":
+		if _a_pressed(event):
+			start_game(HEROES[sel]); return
+		var p := _pointer_pos(event)
+		if p.x >= 0.0:
+			sel = 0 if p.x < SCREEN.x * 0.5 else 1
+			_update_cursor()
+			start_game(HEROES[sel])
+	elif state == "play":
+		if event is InputEventJoypadButton and (event as InputEventJoypadButton).pressed \
+				and (event as InputEventJoypadButton).button_index == JOY_BUTTON_B:
+			_reset_to_select(); return
+		if _a_pressed(event) or _pointer_pos(event).x >= 0.0:
+			_interact()
+
+
+# ---------------------------------------------------------------- village
 func start_game(hero: String) -> void:
 	state = "play"
 	Globals.hero = hero
 	ui.queue_free()
 
-	var bg := Sprite2D.new()
-	bg.texture = load("res://assets/island_bg.png")
-	bg.position = SCREEN * 0.5
-	bg.z_index = -10
-	add_child(bg)
+	_build_island_poly()
 
-	var hud := CanvasLayer.new()
-	add_child(hud)
-	score_label = _label("Presents: 0", 30, Vector2(30, 18), false)
-	hud.add_child(score_label)
-	hud.add_child(_label("Playing as " + hero.to_upper() + "   (B = change hero,  ☰ = menu)", 22, Vector2(30, 58), false))
-	for h in 3:
-		var heart := Sprite2D.new()
-		heart.texture = load("res://assets/heart.png")
-		_fit_height(heart, 46.0)
-		heart.position = Vector2(1130 + h * 48, 40)
-		hud.add_child(heart)
+	world = Node2D.new()
+	world.y_sort_enabled = true
+	add_child(world)
 
-	creature = Sprite2D.new()
-	creature.texture = load("res://assets/grumpy.png")
-	_fit_height(creature, 120.0)
-	creature.position = Vector2(850, 350)
-	creature.z_index = 5
-	add_child(creature)
+	var sky := ColorRect.new()
+	sky.color = Color(0.56, 0.8, 0.95)
+	sky.position = Vector2(-3000, -3000)
+	sky.size = WORLD + Vector2(6000, 6000)
+	sky.z_index = -100
+	world.add_child(sky)
+
+	var ground := Polygon2D.new()
+	ground.polygon = island_poly
+	ground.texture = load("res://assets/grass.png")
+	ground.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+	ground.z_index = -10
+	world.add_child(ground)
+
+	var edge := Line2D.new()
+	var pts := island_poly.duplicate()
+	pts.append(island_poly[0])
+	edge.points = pts
+	edge.width = 16.0
+	edge.default_color = Color(0.36, 0.24, 0.16)
+	edge.joint_mode = Line2D.LINE_JOINT_ROUND
+	edge.z_index = -9
+	world.add_child(edge)
+
+	for tp in [Vector2(950, 720), Vector2(2750, 680), Vector2(1300, 1230),
+			Vector2(2300, 1360), Vector2(820, 1300), Vector2(2950, 1180),
+			Vector2(1520, 640), Vector2(2150, 860)]:
+		var tree := Sprite2D.new()
+		tree.texture = load("res://assets/tree.png")
+		_fit_height(tree, 150.0)
+		tree.position = tp
+		world.add_child(tree)
+
+	var store := Sprite2D.new()
+	store.texture = load("res://assets/store.png")
+	_fit_height(store, 210.0)
+	store.position = store_pos
+	world.add_child(store)
+
+	var balloon := Sprite2D.new()
+	balloon.texture = load("res://assets/balloon_station.png")
+	_fit_height(balloon, 280.0)
+	balloon.position = balloon_pos
+	world.add_child(balloon)
 
 	player = Node2D.new()
-	player.position = Vector2(400, 500)
-	player.z_index = 10
-	add_child(player)
+	player.position = spawn_pos
+	world.add_child(player)
 	var spr := Sprite2D.new()
 	spr.name = "spr"
 	spr.texture = load("res://assets/%s.png" % hero)
-	player_base_scale = _fit_height(spr, 185.0)
+	player_base_scale = _fit_height(spr, 175.0)
 	player.add_child(spr)
 
-	var spots := [
-		Vector2(250, 300), Vector2(1000, 320), Vector2(360, 600),
-		Vector2(930, 600), Vector2(640, 270), Vector2(640, 640),
-	]
-	for s in spots:
-		var p := Sprite2D.new()
-		p.texture = load("res://assets/present.png")
-		_fit_height(p, 78.0)
-		p.position = s
-		add_child(p)
-		presents.append(p)
+	camera = Camera2D.new()
+	camera.position_smoothing_enabled = true
+	camera.position_smoothing_speed = 7.0
+	player.add_child(camera)
+	camera.make_current()
+
+	hud = CanvasLayer.new()
+	add_child(hud)
+	hud.add_child(_label("Home Village   (B = title,  ☰ = menu)", 22, Vector2(24, 18), false))
+	prompt_label = _label("", 30, Vector2(0, 700), true)
+	prompt_label.add_theme_color_override("font_color", Color(1, 1, 1))
+	hud.add_child(prompt_label)
+	popup_label = _label("", 32, Vector2(0, 380), true)
+	popup_label.add_theme_color_override("font_color", Color(1, 1, 1))
+	hud.add_child(popup_label)
+
+
+func _build_island_poly() -> void:
+	island_poly = PackedVector2Array([
+		Vector2(620, 360), Vector2(1300, 230), Vector2(1850, 330), Vector2(2500, 210),
+		Vector2(3050, 420), Vector2(3360, 820), Vector2(3300, 1300), Vector2(2900, 1640),
+		Vector2(2350, 1820), Vector2(1750, 1720), Vector2(1180, 1830), Vector2(640, 1600),
+		Vector2(360, 1150), Vector2(420, 680),
+	])
 
 
 func _process(delta: float) -> void:
@@ -215,18 +259,21 @@ func _process(delta: float) -> void:
 	if state != "play":
 		return
 
-	if encounter_cd > 0.0:
-		encounter_cd -= delta
-
-	if Input.is_action_just_pressed("ui_cancel"):
-		_reset_to_select()
-		return
+	if popup_t > 0.0:
+		popup_t -= delta
+		if popup_t <= 0.0:
+			popup_label.text = ""
 
 	var dir := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
 	var moving := dir.length() > 0.1
-	player.position += dir * 330.0 * delta
-	player.position.x = clampf(player.position.x, AREA_MIN.x, AREA_MAX.x)
-	player.position.y = clampf(player.position.y, AREA_MIN.y, AREA_MAX.y)
+	var move := dir * SPEED * delta
+	var here := player.position
+	if _inside(here + move):
+		player.position = here + move
+	elif _inside(here + Vector2(move.x, 0)):
+		player.position = here + Vector2(move.x, 0)
+	elif _inside(here + Vector2(0, move.y)):
+		player.position = here + Vector2(0, move.y)
 
 	anim_t += delta * (10.0 if moving else 2.5)
 	var s := sin(anim_t)
@@ -240,31 +287,41 @@ func _process(delta: float) -> void:
 		spr.position.y = -absf(s) * 3.0
 		spr.scale = player_base_scale * Vector2(1.0 + 0.03 * s, 1.0 - 0.03 * s)
 
-	# walk into the grumpy creature -> battle
-	if is_instance_valid(creature) and creature.visible and encounter_cd <= 0.0 \
-			and player.position.distance_to(creature.position) < 85.0:
-		_start_battle()
-		return
+	# interaction prompt
+	interact_target = ""
+	var ptxt := ""
+	if player.position.distance_to(store_pos) < 150.0:
+		interact_target = "store"; ptxt = "Ⓐ  General Store"
+	elif player.position.distance_to(balloon_pos) < 180.0:
+		interact_target = "balloon"; ptxt = "Ⓐ  Launch Balloon"
+	prompt_label.text = ptxt
 
-	var any_left := false
-	for p in presents:
-		if p.visible and player.position.distance_to(p.position) < 70.0:
-			p.visible = false
-			score += 1
-			score_label.text = "Presents: %d" % score
-		any_left = any_left or p.visible
-	if not any_left:
-		for p in presents:
-			p.visible = true
+
+func _inside(p: Vector2) -> bool:
+	return Geometry2D.is_point_in_polygon(p, island_poly)
+
+
+func _interact() -> void:
+	match interact_target:
+		"store":
+			_popup("The General Store is coming soon! 🛒")
+		"balloon":
+			_popup("The balloon isn't fueled up yet — adventure soon! 🎈")
+
+
+func _popup(text: String) -> void:
+	if popup_label:
+		popup_label.text = text
+		popup_t = 2.4
 
 
 func _reset_to_select() -> void:
 	for c in get_children():
 		c.queue_free()
+	world = null
 	player = null
-	creature = null
-	presents.clear()
-	score = 0
+	camera = null
+	hud = null
 	call_deferred("show_select")
 
 
@@ -280,16 +337,13 @@ func _start_battle() -> void:
 	await _flash_from_white()
 
 
-func _on_battle_finished(win: bool) -> void:
+func _on_battle_finished(_win: bool) -> void:
 	await _flash_to_white()
 	if is_instance_valid(battle_node):
 		battle_node.queue_free()
 		battle_node = null
-	if win and is_instance_valid(creature):
-		creature.queue_free()
 	if is_instance_valid(player):
-		player.position = Vector2(400, 500)
-	encounter_cd = 1.5
+		player.position = spawn_pos
 	state = "play"
 	await _flash_from_white()
 
@@ -383,8 +437,8 @@ func _menu_select() -> void:
 # ---------------------------------------------------------------- helpers
 func _fit_height(spr: Sprite2D, target_px: float) -> Vector2:
 	var h := spr.texture.get_height()
-	var s := target_px / float(h)
-	spr.scale = Vector2(s, s)
+	var sc := target_px / float(h)
+	spr.scale = Vector2(sc, sc)
 	return spr.scale
 
 

@@ -6,6 +6,12 @@ a tileable ground that repeats to fill the world, plus separate transparent obje
 sprites (buildings, props, later NPCs) placed on top in the engine. So DON'T make
 one giant image — make tileable ground + individual transparent pieces.
 
+**Island shape:** irregular / organic (NOT an oval) — bays, nooks, peninsulas. The
+shape is authored IN-ENGINE (a boundary polygon + collision); you do NOT need to
+draw the whole island silhouette. The AI only makes tileable ground + edge pieces +
+objects; the engine lays them out into a natural, random-looking coastline and
+scatters terrain/props organically.
+
 Use the same soft storybook style block as the rest of the game.
 
 **Style block (prepend to each SUBJECT):**
@@ -31,6 +37,8 @@ wrap seamlessly.
   grass with subtle variation
 - `path.png` > seamless tileable top-down worn dirt path / trail ground
 - `plaza.png` > seamless tileable top-down cobblestone-and-wood town-square ground
+- `dirt.png` > seamless tileable top-down patch of bare dirt / worn earth
+- `pond.png` > seamless tileable top-down shallow pond water, soft ripples
 
 ## 2. Landmarks (transparent building sprites, ~1024×1024)
 - `store.png` > a charming small cartoon GENERAL STORE building, front view at a
