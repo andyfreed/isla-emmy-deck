@@ -21,6 +21,10 @@ var score: int = 0
 var score_label: Label
 var anim_t: float = 0.0
 
+# --- input diagnostics (shown on the select screen) ---
+var dbg: Label
+var last_input: String = "(press a button...)"
+
 
 func _ready() -> void:
 	show_select()
@@ -52,6 +56,10 @@ func show_select() -> void:
 		nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		ui.add_child(nm)
 
+	dbg = _label("", 24, Vector2(20, 720), false)
+	dbg.size = Vector2(SCREEN.x - 40, 70)
+	ui.add_child(dbg)
+
 	_update_cursor()
 
 
@@ -64,14 +72,29 @@ func _update_cursor() -> void:
 
 
 func _input(event: InputEvent) -> void:
-	# Touch/click to pick a hero — robust against Steam Deck controller layouts
-	# that send A as a mouse-click. Tap the side the hero is on.
 	if state != "select":
 		return
+	# record what Godot actually receives, for diagnostics
+	if event is InputEventJoypadButton:
+		var jb := event as InputEventJoypadButton
+		last_input = "JOY button %d  pressed=%s" % [jb.button_index, jb.pressed]
+	elif event is InputEventJoypadMotion:
+		var jm := event as InputEventJoypadMotion
+		if absf(jm.axis_value) > 0.5:
+			last_input = "JOY axis %d = %.2f" % [jm.axis, jm.axis_value]
+	elif event is InputEventKey and (event as InputEventKey).pressed:
+		var k := event as InputEventKey
+		last_input = "KEY %s" % OS.get_keycode_string(k.keycode)
+	elif event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed:
+		last_input = "TOUCH @ %d,%d" % [(event as InputEventScreenTouch).position.x, (event as InputEventScreenTouch).position.y]
+	elif event is InputEventMouseButton and (event as InputEventMouseButton).pressed:
+		last_input = "MOUSE btn %d" % (event as InputEventMouseButton).button_index
+
+	# Touch/click to pick a hero (left = Isla, right = Emmy)
 	var pos := Vector2.INF
-	if event is InputEventScreenTouch and event.pressed:
+	if event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed:
 		pos = (event as InputEventScreenTouch).position
-	elif event is InputEventMouseButton and event.pressed and \
+	elif event is InputEventMouseButton and (event as InputEventMouseButton).pressed and \
 			(event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
 		pos = (event as InputEventMouseButton).position
 	if pos != Vector2.INF:
@@ -130,6 +153,11 @@ func start_game(hero: String) -> void:
 
 func _process(delta: float) -> void:
 	if state == "select":
+		if dbg:
+			var names := PackedStringArray()
+			for id in Input.get_connected_joypads():
+				names.append(Input.get_joy_name(id))
+			dbg.text = "Joypads(%d): %s   |   Last input: %s" % [names.size(), ", ".join(names), last_input]
 		if Input.is_action_just_pressed("ui_left"):
 			sel = (sel - 1 + HEROES.size()) % HEROES.size()
 			_update_cursor()
