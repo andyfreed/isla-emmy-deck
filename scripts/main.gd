@@ -39,7 +39,7 @@ func show_select() -> void:
 	ui.add_child(bg)
 
 	ui.add_child(_label("ISLA & EMMY: FUNKY ISLANDS", 56, Vector2(0, 56), true))
-	ui.add_child(_label("Pick your hero   <  Left / Right  >   then  A", 28, Vector2(0, 156), true))
+	ui.add_child(_label("Tap a hero  —  or  <  Left / Right  >  then  A", 28, Vector2(0, 156), true))
 
 	for i in HEROES.size():
 		var spr := Sprite2D.new()
@@ -63,16 +63,20 @@ func _update_cursor() -> void:
 		spr.modulate = Color(1, 1, 1) if on else Color(0.7, 0.7, 0.7, 0.85)
 
 
-func _unhandled_input(event: InputEvent) -> void:
+func _input(event: InputEvent) -> void:
+	# Touch/click to pick a hero — robust against Steam Deck controller layouts
+	# that send A as a mouse-click. Tap the side the hero is on.
 	if state != "select":
 		return
-	if event.is_action_pressed("ui_left"):
-		sel = (sel - 1 + HEROES.size()) % HEROES.size()
+	var pos := Vector2.INF
+	if event is InputEventScreenTouch and event.pressed:
+		pos = (event as InputEventScreenTouch).position
+	elif event is InputEventMouseButton and event.pressed and \
+			(event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
+		pos = (event as InputEventMouseButton).position
+	if pos != Vector2.INF:
+		sel = 0 if pos.x < SCREEN.x * 0.5 else 1
 		_update_cursor()
-	elif event.is_action_pressed("ui_right"):
-		sel = (sel + 1) % HEROES.size()
-		_update_cursor()
-	elif event.is_action_pressed("ui_accept"):
 		start_game(HEROES[sel])
 
 
@@ -125,6 +129,17 @@ func start_game(hero: String) -> void:
 
 
 func _process(delta: float) -> void:
+	if state == "select":
+		if Input.is_action_just_pressed("ui_left"):
+			sel = (sel - 1 + HEROES.size()) % HEROES.size()
+			_update_cursor()
+		elif Input.is_action_just_pressed("ui_right"):
+			sel = (sel + 1) % HEROES.size()
+			_update_cursor()
+		if Input.is_action_just_pressed("ui_accept"):
+			start_game(HEROES[sel])
+		return
+
 	if state != "play":
 		return
 
