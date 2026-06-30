@@ -31,6 +31,7 @@ var rhythm_pos: float = 0.0
 var rhythm_vel: float = 1.7
 var rhythm_x: float = 360.0
 var rhythm_w: float = 560.0
+var active_marker: Label
 
 
 func _ready() -> void:
@@ -81,6 +82,11 @@ func _ready() -> void:
 	menu_box = VBoxContainer.new()
 	menu_box.position = Vector2(70, 470)
 	ui.add_child(menu_box)
+
+	active_marker = _label("▼", 44, Vector2.ZERO, false)
+	active_marker.add_theme_color_override("font_color", Color(1, 1, 0.3))
+	active_marker.visible = false
+	ui.add_child(active_marker)
 
 	await get_tree().create_timer(0.9).timeout
 	_next_turn()
@@ -141,9 +147,12 @@ func _next_turn() -> void:
 	if actor["is_player"]:
 		state = "choosing"
 		move_cursor = 0
+		msg.add_theme_color_override("font_color", Color(1, 1, 1))
 		msg.text = actor["name"] + "'s turn — pick a move (A)"
+		_show_active(actor)
 		_refresh_menu()
 	else:
+		_hide_active()
 		_enemy_turn()
 
 
@@ -189,12 +198,14 @@ func _lock_rhythm() -> void:
 func _resolve_move(c: Dictionary, move: Dictionary, mult: float, q: String) -> void:
 	if move["kind"] == "heal":
 		var amt := int(move["power"] * mult)
+		await _hop(c["spr"])
 		for s in sisters:
 			if s["alive"]:
 				s["hp"] = min(int(s["max"]), int(s["hp"]) + amt)
 				_update_bar(s)
-		msg.text = "%s — %s  +%d funk to all!" % [move["name"], q, amt]
-		await _hop(c["spr"])
+				_popup_dmg(s["spr"].position, "+%d" % amt, Color(0.4, 1.0, 0.5), false)
+		msg.add_theme_color_override("font_color", Color(0.5, 1, 0.6))
+		msg.text = "%s — %s   heal!" % [move["name"], q]
 		await get_tree().create_timer(0.7).timeout
 		return
 
@@ -202,18 +213,23 @@ func _resolve_move(c: Dictionary, move: Dictionary, mult: float, q: String) -> v
 	var total := 0
 	for h in int(move["hits"]):
 		var dmg := int(move["power"] * mult * (1.5 if clash else 1.0))
+		await _hop(c["spr"])
 		enemy["hp"] = max(0, int(enemy["hp"]) - dmg)
 		total += dmg
 		_update_bar(enemy)
-		await _hop(c["spr"])
+		_flash_white(enemy["spr"])
+		var big := clash or q == "PERFECT!"
+		_popup_dmg(enemy["spr"].position, str(dmg), Color(1, 0.85, 0.2) if big else Color(1, 1, 1), big)
+		_shake_screen(11.0 if big else 5.0)
 		await _shake(enemy["spr"])
-	var txt := "%s — %s  (%d funk)" % [move["name"], q, total]
+	var txt := "%s — %s   (%d funk)" % [move["name"], q, total]
 	if clash:
-		txt += "   ⚡ ZODIAC CLASH! x1.5"
+		txt += "    ⚡ ZODIAC CLASH! ×1.5"
+	_color_msg(q, clash)
 	msg.text = txt
 	if int(enemy["hp"]) <= 0:
 		enemy["alive"] = false
-	await get_tree().create_timer(0.7).timeout
+	await get_tree().create_timer(0.55).timeout
 
 
 func _enemy_turn() -> void:
@@ -223,12 +239,15 @@ func _enemy_turn() -> void:
 	if targets.is_empty():
 		_next_turn(); return
 	var t: Dictionary = targets[randi() % targets.size()]
+	msg.add_theme_color_override("font_color", Color(1, 1, 1))
 	msg.text = enemy["name"] + " grumbles angrily!"
-	await get_tree().create_timer(0.6).timeout
+	await get_tree().create_timer(0.5).timeout
 	await _hop(enemy["spr"])
 	var dmg := 7 + (randi() % 7)
 	t["hp"] = max(0, int(t["hp"]) - dmg)
 	_update_bar(t)
+	_popup_dmg(t["spr"].position, str(dmg), Color(1, 0.5, 0.5), false)
+	_shake_screen(7.0)
 	await _shake(t["spr"])
 	if int(t["hp"]) <= 0:
 		t["alive"] = false
@@ -243,8 +262,16 @@ func _enemy_turn() -> void:
 func _finish(win: bool) -> void:
 	state = "done"
 	_clear_menu()
-	msg.text = "Grumblehoof is calm again — it floats home to the Moon! 🌙" if win else "Out of funk! You retreat to rest..."
-	await get_tree().create_timer(1.4).timeout
+	_hide_active()
+	if win:
+		msg.add_theme_color_override("font_color", Color(0.6, 1, 0.7))
+		msg.text = "Grumblehoof is calm again! 🌙"
+		await _calm_sequence()
+		await get_tree().create_timer(0.6).timeout
+	else:
+		msg.add_theme_color_override("font_color", Color(1, 0.7, 0.7))
+		msg.text = "Out of funk! You retreat to rest..."
+		await get_tree().create_timer(1.2).timeout
 	battle_finished.emit(win)
 
 
@@ -274,7 +301,11 @@ func _make_bar(c: Dictionary, pos: Vector2, w: float) -> void:
 
 func _update_bar(c: Dictionary) -> void:
 	var f := clampf(float(c["hp"]) / float(c["max"]), 0.0, 1.0)
-	c["bar_fill"].size.x = c["bar_w"] * f
+	if c.has("bar_tween") and c["bar_tween"] != null and (c["bar_tween"] as Tween).is_valid():
+		(c["bar_tween"] as Tween).kill()
+	var tw := create_tween()
+	c["bar_tween"] = tw
+	tw.tween_property(c["bar_fill"], "size:x", c["bar_w"] * f, 0.25)
 	c["bar_fill"].color = Color(0.85, 0.3, 0.3) if f < 0.3 else Color(0.3, 0.85, 0.4)
 
 
@@ -323,6 +354,84 @@ func _shake(spr: Sprite2D) -> void:
 		tw.tween_property(spr, "position", base + Vector2(-9, 0), 0.04)
 	tw.tween_property(spr, "position", base, 0.04)
 	await tw.finished
+
+
+func _popup_dmg(pos: Vector2, text: String, color: Color, big: bool) -> void:
+	var l := Label.new()
+	l.text = text
+	l.add_theme_font_size_override("font_size", 56 if big else 38)
+	l.add_theme_color_override("font_color", color)
+	l.add_theme_color_override("font_outline_color", Color(0, 0, 0))
+	l.add_theme_constant_override("outline_size", 6)
+	l.position = pos + Vector2(-18, -150)
+	l.z_index = 60
+	ui.add_child(l)
+	var tw := create_tween()
+	tw.tween_property(l, "position:y", l.position.y - 90, 0.7)
+	tw.parallel().tween_property(l, "modulate:a", 0.0, 0.7)
+	tw.tween_callback(l.queue_free)
+
+
+func _flash_white(spr: Sprite2D) -> void:
+	spr.modulate = Color(1.8, 1.8, 1.8)
+	var tw := create_tween()
+	tw.tween_property(spr, "modulate", Color(1, 1, 1), 0.22)
+
+
+func _shake_screen(amount: float) -> void:
+	var tw := create_tween()
+	for i in 4:
+		tw.tween_property(ui, "offset", Vector2(randf_range(-amount, amount), randf_range(-amount, amount)), 0.03)
+	tw.tween_property(ui, "offset", Vector2.ZERO, 0.04)
+
+
+func _color_msg(q: String, clash: bool) -> void:
+	var col := Color(1, 1, 1)
+	if clash:
+		col = Color(1, 0.8, 0.2)
+	elif q == "PERFECT!":
+		col = Color(0.5, 1, 0.6)
+	msg.add_theme_color_override("font_color", col)
+
+
+func _sparkle(pos: Vector2) -> void:
+	var s := Label.new()
+	s.text = "✦"
+	s.add_theme_font_size_override("font_size", 44)
+	s.add_theme_color_override("font_color", Color(1, 1, 0.6))
+	s.position = pos + Vector2(randf_range(-90, 90), randf_range(-90, 40))
+	s.z_index = 70
+	ui.add_child(s)
+	var tw := create_tween()
+	tw.tween_property(s, "position:y", s.position.y - 130, 0.9)
+	tw.parallel().tween_property(s, "modulate:a", 0.0, 0.9)
+	tw.tween_callback(s.queue_free)
+
+
+func _calm_sequence() -> void:
+	var spr: Sprite2D = enemy["spr"]
+	var tw := create_tween()
+	tw.tween_property(spr, "modulate", Color(1.3, 1.25, 1.1), 0.3)
+	await tw.finished
+	await _hop(spr)
+	await _hop(spr)
+	for i in 10:
+		_sparkle(spr.position)
+	var tw2 := create_tween()
+	tw2.tween_property(spr, "position:y", spr.position.y - 600, 1.3)
+	tw2.parallel().tween_property(spr, "modulate:a", 0.0, 1.3)
+	await tw2.finished
+
+
+func _show_active(c: Dictionary) -> void:
+	active_marker.visible = true
+	var sp: Sprite2D = c["spr"]
+	active_marker.position = sp.position + Vector2(-14, -150)
+
+
+func _hide_active() -> void:
+	if active_marker:
+		active_marker.visible = false
 
 
 func _label(text: String, size: int, pos: Vector2, centered: bool) -> Label:
