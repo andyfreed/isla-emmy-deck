@@ -1,25 +1,37 @@
 extends Node2D
-## Vertical slice with the real art: character select (Emmy / Isla) -> walk the
-## island collecting presents. Gamepad-first (Steam Deck). Sprites are sized by
-## target on-screen height so any art drops in cleanly. Idle-bob + walk-squash
-## give the characters life from a single static drawing.
+## Overworld + character select. Pick Emmy/Isla, walk the island collecting
+## presents, walk into the grumpy creature (or use the Start test menu) to enter
+## an FF-style Funk-Off battle. Gamepad-first (Steam Deck) with touch fallbacks.
 
 const HEROES: Array[String] = ["isla", "emmy"]
 const SCREEN := Vector2(1280, 800)
-
-# play-area clamp (keep the kids on the island grass, below the HUD)
 const AREA_MIN := Vector2(150, 230)
 const AREA_MAX := Vector2(1130, 700)
+const BATTLE := preload("res://battle.tscn")
 
-var state: String = "select"
+var state: String = "select"        # select / play / battle
 var sel: int = 0
 var ui: CanvasLayer
 var player: Node2D
 var player_base_scale: Vector2 = Vector2.ONE
 var presents: Array[Sprite2D] = []
+var creature: Sprite2D
 var score: int = 0
 var score_label: Label
 var anim_t: float = 0.0
+var encounter_cd: float = 0.0
+
+# battle transition
+var battle_node: Node
+var flash_layer: CanvasLayer
+var flash_rect: ColorRect
+
+# pause / test menu
+var menu_open: bool = false
+var menu_layer: CanvasLayer
+var menu_vbox: VBoxContainer
+var menu_cursor: int = 0
+var menu_items: Array[String] = []
 
 
 func _ready() -> void:
@@ -63,22 +75,38 @@ func _update_cursor() -> void:
 		spr.modulate = Color(1, 1, 1) if on else Color(0.7, 0.7, 0.7, 0.85)
 
 
+# ---------------------------------------------------------------- input
 func _input(event: InputEvent) -> void:
-	# Handle gamepad face buttons directly — robust on the Steam Deck, where
-	# Godot's built-in accept/cancel actions aren't mapped to the buttons.
+	# Open/close the test menu with Start (☰) or Back (⧉) or Escape.
+	var menu_btn := false
+	if event is InputEventJoypadButton and (event as InputEventJoypadButton).pressed:
+		var bi := (event as InputEventJoypadButton).button_index
+		if bi == JOY_BUTTON_START or bi == JOY_BUTTON_BACK:
+			menu_btn = true
+	elif event is InputEventKey and (event as InputEventKey).pressed \
+			and (event as InputEventKey).keycode == KEY_ESCAPE:
+		menu_btn = true
+	if menu_btn and state != "battle":
+		_toggle_menu()
+		return
+
+	if menu_open:
+		if _confirm_pressed(event):
+			_menu_select()
+		return
+
+	# gamepad face buttons handled directly (Deck-robust)
 	if event is InputEventJoypadButton and (event as InputEventJoypadButton).pressed:
 		var b := (event as InputEventJoypadButton).button_index
 		if state == "select" and b == JOY_BUTTON_A:
-			start_game(HEROES[sel])
-			return
+			start_game(HEROES[sel]); return
 		if state == "play" and b == JOY_BUTTON_B:
-			_reset_to_select()
-			return
+			_reset_to_select(); return
 
 	if state != "select":
 		return
 
-	# Touch/click to pick a hero (left = Isla, right = Emmy)
+	# touch/click to pick a hero (left = Isla, right = Emmy)
 	var pos := Vector2.INF
 	if event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed:
 		pos = (event as InputEventScreenTouch).position
@@ -89,6 +117,20 @@ func _input(event: InputEvent) -> void:
 		sel = 0 if pos.x < SCREEN.x * 0.5 else 1
 		_update_cursor()
 		start_game(HEROES[sel])
+
+
+func _confirm_pressed(event: InputEvent) -> bool:
+	if event is InputEventJoypadButton and (event as InputEventJoypadButton).pressed \
+			and (event as InputEventJoypadButton).button_index == JOY_BUTTON_A:
+		return true
+	if event.is_action_pressed("ui_accept"):
+		return true
+	if event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed:
+		return true
+	if event is InputEventMouseButton and (event as InputEventMouseButton).pressed \
+			and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
+		return true
+	return false
 
 
 # ---------------------------------------------------------------- world
@@ -107,8 +149,7 @@ func start_game(hero: String) -> void:
 	add_child(hud)
 	score_label = _label("Presents: 0", 30, Vector2(30, 18), false)
 	hud.add_child(score_label)
-	hud.add_child(_label("Playing as " + hero.to_upper() + "   (B = change hero)", 22, Vector2(30, 58), false))
-	# heart HUD (cosmetic preview of the health bar)
+	hud.add_child(_label("Playing as " + hero.to_upper() + "   (B = change hero,  ☰ = menu)", 22, Vector2(30, 58), false))
 	for h in 3:
 		var heart := Sprite2D.new()
 		heart.texture = load("res://assets/heart.png")
@@ -116,8 +157,15 @@ func start_game(hero: String) -> void:
 		heart.position = Vector2(1130 + h * 48, 40)
 		hud.add_child(heart)
 
+	creature = Sprite2D.new()
+	creature.texture = load("res://assets/grumpy.png")
+	_fit_height(creature, 120.0)
+	creature.position = Vector2(850, 350)
+	creature.z_index = 5
+	add_child(creature)
+
 	player = Node2D.new()
-	player.position = SCREEN * 0.5
+	player.position = Vector2(400, 500)
 	player.z_index = 10
 	add_child(player)
 	var spr := Sprite2D.new()
@@ -140,6 +188,15 @@ func start_game(hero: String) -> void:
 
 
 func _process(delta: float) -> void:
+	if menu_open:
+		if Input.is_action_just_pressed("ui_up"):
+			menu_cursor = (menu_cursor - 1 + menu_items.size()) % menu_items.size()
+			_refresh_menu()
+		elif Input.is_action_just_pressed("ui_down"):
+			menu_cursor = (menu_cursor + 1) % menu_items.size()
+			_refresh_menu()
+		return
+
 	if state == "select":
 		if Input.is_action_just_pressed("ui_left"):
 			sel = (sel - 1 + HEROES.size()) % HEROES.size()
@@ -154,6 +211,9 @@ func _process(delta: float) -> void:
 	if state != "play":
 		return
 
+	if encounter_cd > 0.0:
+		encounter_cd -= delta
+
 	if Input.is_action_just_pressed("ui_cancel"):
 		_reset_to_select()
 		return
@@ -164,7 +224,6 @@ func _process(delta: float) -> void:
 	player.position.x = clampf(player.position.x, AREA_MIN.x, AREA_MAX.x)
 	player.position.y = clampf(player.position.y, AREA_MIN.y, AREA_MAX.y)
 
-	# --- juice: idle bob + walk squash on the single static sprite ---
 	anim_t += delta * (10.0 if moving else 2.5)
 	var s := sin(anim_t)
 	var spr := player.get_node("spr") as Sprite2D
@@ -177,7 +236,12 @@ func _process(delta: float) -> void:
 		spr.position.y = -absf(s) * 3.0
 		spr.scale = player_base_scale * Vector2(1.0 + 0.03 * s, 1.0 - 0.03 * s)
 
-	# --- collect presents ---
+	# walk into the grumpy creature -> battle
+	if is_instance_valid(creature) and creature.visible and encounter_cd <= 0.0 \
+			and player.position.distance_to(creature.position) < 85.0:
+		_start_battle()
+		return
+
 	var any_left := false
 	for p in presents:
 		if p.visible and player.position.distance_to(p.position) < 70.0:
@@ -194,9 +258,122 @@ func _reset_to_select() -> void:
 	for c in get_children():
 		c.queue_free()
 	player = null
+	creature = null
 	presents.clear()
 	score = 0
 	call_deferred("show_select")
+
+
+# ---------------------------------------------------------------- battle
+func _start_battle() -> void:
+	state = "battle"
+	await _flash_to_white()
+	var b := BATTLE.instantiate()
+	b.enemy_sign = "horse"
+	b.battle_finished.connect(_on_battle_finished)
+	add_child(b)
+	battle_node = b
+	await _flash_from_white()
+
+
+func _on_battle_finished(win: bool) -> void:
+	await _flash_to_white()
+	if is_instance_valid(battle_node):
+		battle_node.queue_free()
+		battle_node = null
+	if win and is_instance_valid(creature):
+		creature.queue_free()
+	if is_instance_valid(player):
+		player.position = Vector2(400, 500)
+	encounter_cd = 1.5
+	state = "play"
+	await _flash_from_white()
+
+
+func _flash_to_white() -> void:
+	flash_layer = CanvasLayer.new()
+	flash_layer.layer = 100
+	add_child(flash_layer)
+	flash_rect = ColorRect.new()
+	flash_rect.color = Color(1, 1, 1)
+	flash_rect.modulate = Color(1, 1, 1, 0)
+	flash_rect.size = SCREEN
+	flash_layer.add_child(flash_rect)
+	var tw := create_tween()
+	tw.tween_property(flash_rect, "modulate:a", 1.0, 0.18)
+	await tw.finished
+
+
+func _flash_from_white() -> void:
+	if flash_rect:
+		var tw := create_tween()
+		tw.tween_property(flash_rect, "modulate:a", 0.0, 0.28)
+		await tw.finished
+	if flash_layer:
+		flash_layer.queue_free()
+		flash_layer = null
+		flash_rect = null
+
+
+# ---------------------------------------------------------------- test / pause menu
+func _toggle_menu() -> void:
+	if menu_open:
+		_close_menu()
+	else:
+		_open_menu()
+
+
+func _open_menu() -> void:
+	menu_open = true
+	menu_cursor = 0
+	menu_items = ["Resume"]
+	if state == "play":
+		menu_items.append("Test Battle")
+	menu_items.append("Quit Game")
+
+	menu_layer = CanvasLayer.new()
+	menu_layer.layer = 80
+	add_child(menu_layer)
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.6); dim.size = SCREEN
+	menu_layer.add_child(dim)
+	menu_layer.add_child(_label("— MENU —", 44, Vector2(0, 230), true))
+	menu_vbox = VBoxContainer.new()
+	menu_vbox.position = Vector2(SCREEN.x * 0.5 - 140, 340)
+	menu_layer.add_child(menu_vbox)
+	_refresh_menu()
+
+
+func _close_menu() -> void:
+	menu_open = false
+	if is_instance_valid(menu_layer):
+		menu_layer.queue_free()
+	menu_layer = null
+
+
+func _refresh_menu() -> void:
+	if not is_instance_valid(menu_vbox):
+		return
+	for ch in menu_vbox.get_children():
+		menu_vbox.remove_child(ch)
+		ch.queue_free()
+	for i in menu_items.size():
+		var l := _label(("> " if i == menu_cursor else "   ") + menu_items[i], 36, Vector2.ZERO, false)
+		l.add_theme_color_override("font_color", Color(1, 1, 0.7) if i == menu_cursor else Color(1, 1, 1))
+		menu_vbox.add_child(l)
+
+
+func _menu_select() -> void:
+	var item := menu_items[menu_cursor]
+	_close_menu()
+	match item:
+		"Resume":
+			pass
+		"Test Battle":
+			if state == "play":
+				_start_battle()
+		"Quit Game":
+			get_tree().quit()
 
 
 # ---------------------------------------------------------------- helpers

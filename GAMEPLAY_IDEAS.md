@@ -97,6 +97,11 @@ more ways to explore + bigger battle kit.
 | Dog 개 | Sniff | Loyal Guard — puppy shields a sister |
 | Pig 돼지 | Lucky | Lucky Feast — big party heal |
 
+### Audience — geared to 9+ (Emmy)
+Tune gameplay/difficulty for Emmy (9+). Isla (6) will see it but may not play much
+yet, so DON'T dumb it down — real skill (rhythm timing) and real stakes (losable
+battles) are good. Keep the tone gentle/non-scary, but the challenge can be genuine.
+
 ### Art style — LOCKED
 Soft storybook: sketchy ink outlines + watercolor texture (per the approved sample
 set). NOT the gritty Mewgenics end. Isla = blonde + pink overalls; Emmy = brunette
