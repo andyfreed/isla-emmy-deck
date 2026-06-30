@@ -9,9 +9,11 @@ const SCREEN := Vector2(1280, 800)
 const WORLD := Vector2(3600, 2000)
 const BATTLE := preload("res://battle.tscn")
 const SPEED := 340.0
+const STORY_TEXT := "Long ago, the 12 lucky Zodiac animals lived happily on the Moon.\n\nBut someone did something... and they all tumbled down onto the Funky Islands!\n\nFar from the Moon, they lost their good luck — and grumpy, they started causing trouble in the village.\n\nOnly Isla & Emmy can calm them with a funky dance-off and send each one back home to the Moon.\n\nCalm all 12 and bring back the good luck!"
 
-var state: String = "select"        # select / play / battle
+var state: String = "select"        # select / intro / play / battle
 var sel: int = 0
+var pending_hero: String = "isla"
 var ui: CanvasLayer
 
 # village
@@ -135,6 +137,9 @@ func _input(event: InputEvent) -> void:
 			sel = 0 if p.x < SCREEN.x * 0.5 else 1
 			_update_cursor()
 			start_game(HEROES[sel])
+	elif state == "intro":
+		if _a_pressed(event) or _pointer_pos(event).x >= 0.0:
+			_enter_village(pending_hero)
 	elif state == "play":
 		if event is InputEventJoypadButton and (event as InputEventJoypadButton).pressed \
 				and (event as InputEventJoypadButton).button_index == JOY_BUTTON_B:
@@ -143,10 +148,33 @@ func _input(event: InputEvent) -> void:
 			_interact()
 
 
-# ---------------------------------------------------------------- village
+# ---------------------------------------------------------------- intro story
 func start_game(hero: String) -> void:
-	state = "play"
+	pending_hero = hero
 	Globals.hero = hero
+	state = "intro"
+	ui.queue_free()
+
+	ui = CanvasLayer.new()
+	add_child(ui)
+	var bg := ColorRect.new()
+	bg.color = Color(0.08, 0.10, 0.24)
+	bg.size = SCREEN
+	ui.add_child(bg)
+	ui.add_child(_label("🌙   THE MOON ZODIAC   🌙", 48, Vector2(0, 70), true))
+	var story := _label(STORY_TEXT, 30, Vector2(140, 190), false)
+	story.size = Vector2(SCREEN.x - 280, 470)
+	story.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	story.add_theme_color_override("font_color", Color(1, 1, 1))
+	story.add_theme_color_override("font_outline_color", Color(0, 0, 0))
+	story.add_theme_constant_override("outline_size", 5)
+	ui.add_child(story)
+	ui.add_child(_label("Press A  (or tap)  to begin", 28, Vector2(0, 722), true))
+
+
+# ---------------------------------------------------------------- village
+func _enter_village(hero: String) -> void:
+	state = "play"
 	ui.queue_free()
 
 	_build_island_poly()

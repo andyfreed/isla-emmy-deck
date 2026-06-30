@@ -1,45 +1,49 @@
-# Isla & Emmy: Funky Islands — Lore & World (DRAFT)
+# Isla & Emmy: Funky Islands — Lore & World
 
-Everything here is a first draft to refine with Isla & Emmy. Names especially are
-placeholders — let the girls rename islands, spirits, and creatures.
+## Premise (Emmy's idea — CANON) 🌙
+Long ago, the **12 lucky Zodiac animals** (the Korean zodiac 띠) lived happily on
+the **Moon**, keeping everyone's good luck.
 
-## Premise
-The **Funky Islands** float in the sky, kept happy, colorful, and *dancing* by the
-**12 Zodiac Spirits** (the Korean zodiac 띠 animals). One day the music stopped —
-the Spirits caught a case of the grumps and drifted off to hide across the islands.
-Without them the islands lost their funk: colors faded, and the islands began to
-float apart.
+Then **someone did something** — and all 12 creatures **tumbled down from the Moon**
+onto the Funky Islands. Far from the Moon, they **lost their good luck**, and being
+unlucky and grumpy, they started **causing trouble in the village**.
 
-Sisters **Isla & Emmy** set off in their **hot-air balloon**, island to island, to
-explore, use their zodiac powers, cheer up the grumpy creatures, and find &
-befriend all 12 Zodiac Spirits — bringing the funk back.
+So **Isla & Emmy** set out to **calm each creature down** (a funky dance-off battle
+that restores its groove and luck) and **send it back home to the Moon**. Calm all
+12 and the good luck returns — peace restored. 🎉
 
-- **No villain. No losing.** The whole quest is spreading joy. "Enemies" are just
-  grumpy/sad creatures you cheer up (gentle turn-based battles).
-- **Goal:** collect all 12 zodiac signs → the islands reunite for a dance-party finale.
+## How it maps to the mechanics (this is the elegant part)
+- The **12 zodiac creatures = the enemies** you face — each a grumpy, unlucky moon
+  animal causing trouble.
+- A **Funk-Off battle = calming it down** (out-funk it / restore its groove). It's
+  losable: if the sisters run out of funk they retreat and try again.
+- **Calming a creature → it returns to the Moon AND leaves you its zodiac power**
+  (its "good luck" gift). So beating a creature = gaining that sign's power.
+- **Collect/send home all 12** = win condition + restores the village's luck.
+- (Optional flavor: each sister has her own birth-year guardian sign already with
+  her — Isla = Rat 쥐, Emmy = Monkey 원숭이 — as a starting power.)
 
-## Map (5 islands + home)
-World-map screen; the balloon travels between islands the sisters have reached.
-
-| Island | Zodiac Spirits | Vibe |
-|---|---|---|
-| Cozy Hollow (home/start) | — (tutorial) | warm meadow, the sisters' home |
-| Nibblewood | Rat 쥐 · Rabbit 토끼 | burrows & hops — small, squeezy |
-| Thunderhoof Fields | Ox 소 · Horse 말 | open plains — strong & fast |
-| Tangle Jungle | Monkey 원숭이 · Snake 뱀 | vines & roots — climb & slither |
-| Sunny Acres | Rooster 닭 · Dog 개 · Pig 돼지 | a farm — the friendly trio |
-| Cloudtop Peak | Tiger 호랑이 · Dragon 용 · Sheep 양 | clouds — brave & floaty |
-
-Isla starts with Rat (home turf = Nibblewood); Emmy starts with Monkey (Tangle Jungle).
+## The world
+- **Home Village** (hub): where the trouble is happening; the sisters' base. Shop,
+  level-up, NPCs, and the balloon launch. (Built — scrolling organic island.)
+- **Hot-air balloon**: travels from the village to other islands/areas where
+  creatures are causing trouble. (LOCKED.)
+- The **Moon** hangs in the sky above — the goal you send creatures back to.
 
 ## Story beats
-1. **Home:** the funk fades, Spirits scatter. Tutorial on Cozy Hollow.
-2. **Each island:** explore → zodiac-power puzzles → cheer up grumpy creatures
-   (battles) → find & befriend the island's Zodiac Spirit(s) → gain their sign(s).
-   The island regains color & music as you go.
-3. **Finale:** all 12 reunited → islands come back together → big celebration → loop.
+1. **Intro:** the zodiac fell from the Moon, lost their luck, troubling the village.
+   (In-game opening story screen — built.)
+2. **Hub:** start in the village; balloon out to find troublemaking creatures.
+3. **Each creature:** explore -> find the grumpy zodiac creature -> Funk-Off to calm
+   it -> it returns to the Moon and grants its zodiac power.
+4. **Finale:** all 12 calmed and home -> good luck restored -> celebration -> loop.
 
 ## Open questions (for the girls)
-- Island names? Spirit names/personalities? What are the grumpy creatures called?
-- What's the balloon look like / is it a creature instead?
-- Any real-life favorites to weave in (foods, pets, colors, jokes)?
+- **WHO did it, and WHAT did they do** to knock the creatures off the Moon? (A
+  mischief-maker? an eclipse? someone bumped the Moon? — great hook for Emmy/Isla.)
+- Names/personalities for the 12 creatures? What trouble does each cause?
+- Island names? What's in the village (shops, NPCs)?
+
+## Naming note
+Keep the title **Funky Islands** (logo done) — "funky" = the music/dance vibe, and
+calming creatures is literally a **funk dance-off**. Fits Emmy's Moon story cleanly.

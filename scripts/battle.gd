@@ -48,7 +48,7 @@ func _ready() -> void:
 	tint.size = SCREEN
 	ui.add_child(tint)
 
-	msg = _label("A grumpy creature blocks the way!", 30, Vector2(0, 26), true)
+	msg = _label("A grumpy moon creature is causing trouble!", 30, Vector2(0, 26), true)
 	ui.add_child(msg)
 
 	enemy = _make_combatant("Grumblehoof", enemy_sign, 70, false,
@@ -243,7 +243,7 @@ func _enemy_turn() -> void:
 func _finish(win: bool) -> void:
 	state = "done"
 	_clear_menu()
-	msg.text = "Grumblehoof turns happy and floats away! 🎉" if win else "Out of funk! You retreat to rest..."
+	msg.text = "Grumblehoof is calm again — it floats home to the Moon! 🌙" if win else "Out of funk! You retreat to rest..."
 	await get_tree().create_timer(1.4).timeout
 	battle_finished.emit(win)
 
