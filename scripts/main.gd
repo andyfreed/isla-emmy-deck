@@ -50,16 +50,20 @@ func show_select() -> void:
 	bg.size = SCREEN
 	ui.add_child(bg)
 
-	ui.add_child(_label("ISLA & EMMY: FUNKY ISLANDS", 56, Vector2(0, 56), true))
-	ui.add_child(_label("Tap a hero  —  or  <  Left / Right  >  then  A", 28, Vector2(0, 156), true))
+	var logo := Sprite2D.new()
+	logo.texture = load("res://assets/logo.png")
+	_fit_height(logo, 270.0)
+	logo.position = Vector2(SCREEN.x * 0.5, 160)
+	ui.add_child(logo)
+	ui.add_child(_label("Tap a hero  —  or  <  Left / Right  >  then  A", 28, Vector2(0, 312), true))
 
 	for i in HEROES.size():
 		var spr := Sprite2D.new()
 		spr.texture = load("res://assets/%s.png" % HEROES[i])
-		spr.position = Vector2(440 + i * 400, 470)
+		spr.position = Vector2(440 + i * 400, 540)
 		spr.name = "portrait_%d" % i
 		ui.add_child(spr)
-		var nm := _label(HEROES[i].to_upper(), 40, Vector2(440 + i * 400 - 140, 650), false)
+		var nm := _label(HEROES[i].to_upper(), 40, Vector2(440 + i * 400 - 140, 724), false)
 		nm.size = Vector2(280, 50)
 		nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		ui.add_child(nm)
@@ -71,7 +75,7 @@ func _update_cursor() -> void:
 	for i in HEROES.size():
 		var spr := ui.get_node("portrait_%d" % i) as Sprite2D
 		var on := i == sel
-		_fit_height(spr, 440.0 if on else 360.0)
+		_fit_height(spr, 360.0 if on else 300.0)
 		spr.modulate = Color(1, 1, 1) if on else Color(0.7, 0.7, 0.7, 0.85)
 
 

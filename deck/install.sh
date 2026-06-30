@@ -22,6 +22,12 @@ chmod +x "$DIR/launch.sh"
 # icon for the Steam entry
 curl -fsSL -o "$DIR/icon.png" "$RAW/icon.png" || true
 
+# Steam library artwork (capsule / banner / icon / logo) for Set Custom Artwork
+mkdir -p "$DIR/art"
+for f in capsule banner icon logo; do
+    curl -fsSL -o "$DIR/art/$f.png" "$RAW/steam/$f.png" || true
+done
+
 # desktop entry -> appears in Steam's Add-Non-Steam-Game list
 cat > "$APPS/isla-emmy.desktop" <<EOF
 [Desktop Entry]
@@ -54,5 +60,11 @@ cat <<'DONE'
   Now switch to Game Mode — it's in your library under
   NON-STEAM. Launch it like any game; it auto-updates
   itself from GitHub every time you open it.
+
+  OPTIONAL — pretty Steam library art:
+  Right-click the game -> Manage -> Set Custom Artwork,
+  and pick from  ~/Games/isla-emmy/art/  :
+    capsule.png (grid)  banner.png (hero)
+    logo.png (logo)     icon.png (icon)
 ==========================================================
 DONE
