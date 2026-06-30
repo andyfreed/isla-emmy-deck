@@ -35,9 +35,6 @@ func show_select() -> void:
 	var title := _label("ISLA & EMMY: FUNKY ISLANDS", 56, Vector2(0, 70), true)
 	ui.add_child(title)
 	ui.add_child(_label("Pick your hero   <  Left / Right  >   then  A", 28, Vector2(0, 180), true))
-	var ver := _label("auto-update test - build 2", 20, Vector2(0, 760), true)
-	ver.modulate = Color(1, 1, 1, 0.6)
-	ui.add_child(ver)
 
 	for i in HEROES.size():
 		var h: String = HEROES[i]
