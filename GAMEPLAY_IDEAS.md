@@ -32,13 +32,30 @@ are about exploring/discovering/traversing, never fighting.
   helps younger, no losing").
 - **Active** signs are a power on a button; equip one at a time, swap at shrines.
 
-### Personalization
-- Korean zodiac is by **birth year** — each sister could START with her own birth-year
-  sign as her signature power. (Need Isla's & Emmy's birth years to set this.)
+### Personalization — signature starting signs (LOCKED)
+Korean zodiac is by birth year, so each sister starts with her own real sign:
+- **Isla (born 2020) → Rat 쥐 → Squeeze** (shrink into tiny gaps)
+- **Emmy (born 2016) → Monkey 원숭이 → Climb** (scale walls, swing on vines)
+
+Nice age-logic: big sister = climber, little sister = squeezer. Picking a hero
+therefore plays differently from the first second.
+(Caveat: zodiac flips at Lunar New Year ~late Jan/Feb; confirm if either was born
+that early — otherwise Rat & Monkey stand.)
+
+### Single-player with two heroes — DIRECTION
+It's pick-ONE single-player (the existing character-select). You don't control both
+at once. Chosen approach to start with:
+- **① Solo + buddy-at-home (chosen):** play one hero; the other sister is a friendly
+  presence at the home base / shrines (waves you off, cheers on finds). Both girls
+  are in the game; only one is controlled. Cheap, warm, simple.
+- Alt ②: pure solo playthroughs (play the other in a new game).
+- Alt ③ (later, ambitious): switchable duo — tap to swap sisters, combine powers.
+
+Each sister starts with her signature sign; both can collect all 12 through play.
 
 ### Open questions
 - Equip 1 active at a time, or a small loadout (2)?
-- Are signs shared between Isla/Emmy or per-character?
+- Are collected signs shared between playthroughs/sisters, or per-character?
 - Do presents stay as short silly buffs while zodiac signs are the permanent powers?
 
 ---
