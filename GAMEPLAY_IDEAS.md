@@ -42,16 +42,22 @@ therefore plays differently from the first second.
 (Caveat: zodiac flips at Lunar New Year ~late Jan/Feb; confirm if either was born
 that early — otherwise Rat & Monkey stand.)
 
-### Single-player with two heroes — DIRECTION
-It's pick-ONE single-player (the existing character-select). You don't control both
-at once. Chosen approach to start with:
-- **① Solo + buddy-at-home (chosen):** play one hero; the other sister is a friendly
-  presence at the home base / shrines (waves you off, cheers on finds). Both girls
-  are in the game; only one is controlled. Cheap, warm, simple.
-- Alt ②: pure solo playthroughs (play the other in a new game).
-- Alt ③ (later, ambitious): switchable duo — tap to swap sisters, combine powers.
+### Two heroes — DIRECTION: Final Fantasy party model (CHOSEN)
+Both sisters are ALWAYS together as a party of two; both are equally part of the
+story. Single-player: you directly steer the **lead** (the one picked at select),
+the other **follows and fully participates**.
+- **Swap lead with a button** → use either sister's zodiac power on demand
+  (Emmy = Climb, Isla = Squeeze).
+- Enables **two-sister puzzles**: Isla squeezes through a gap to open a gate for
+  Emmy; Emmy climbs to drop a vine for Isla. (The co-op heart of the NES vision,
+  inside a single-player game.)
+- Each sister starts with her signature sign; the party collects all 12 through play.
 
-Each sister starts with her signature sign; both can collect all 12 through play.
+**OPEN FORK — combat or not?** User referenced "fights" (FF framing). Decide:
+- (a) No-combat: "fights" = friendly co-op challenges/events, no game-over (matches
+  original kid-friendly design).
+- (b) Gentle FF-style turn-based battles: both sisters take turns w/ zodiac powers,
+  soft & un-scary (enemies give up / turn friendly, nobody gets hurt).
 
 ### Open questions
 - Equip 1 active at a time, or a small loadout (2)?
