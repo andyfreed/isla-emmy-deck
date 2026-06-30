@@ -53,10 +53,30 @@ the other **follows and fully participates**.
   inside a single-player game.)
 - Each sister starts with her signature sign; the party collects all 12 through play.
 
-**COMBAT — DECIDED: gentle turn-based battles (b).** Both sisters take turns using
-zodiac powers. Soft & un-scary: enemies are grumpy/sad creatures you cheer up or
-calm until they turn happy and leave/join — no death, no game-over. If the party
-runs out of hearts, they sit down dizzy and pop back.
+**COMBAT — "FUNK-OFF" BATTLES (losable, HP, unique system).**
+Battles are framed as **dance-offs / funk battles**: you and a grumpy creature trade
+funky moves — non-violent in feel ("out-funk them"), but real back-and-forth combat
+with HP and the ability to LOSE.
+
+Losing handling (stakes without cruelty): a lost *battle* is NOT game-over for the
+*game*. HP runs out -> sisters "run out of funk," retreat to the balloon to rest,
+retry the battle. The creature stays put, so progress is gated until you win. No
+death, no deleted save. Sting is tunable later (e.g. drop some treats on a loss).
+
+### Unique system — four pillars
+1. **Groove meters (HP)** on both sides.
+2. **Rhythm timing** — hitting the button on the beat amplifies a move (and timed
+   defense reduces damage). Skill-based + ties to the music/funk theme. Makes
+   battles fairly losable.
+3. **Real Korean-zodiac type chart** (the hook):
+   - Trines (삼합): Rat·Dragon·Monkey | Ox·Snake·Rooster | Tiger·Horse·Dog | Rabbit·Sheep·Pig
+   - Clashes (충): Rat↔Horse, Ox↔Sheep, Tiger↔Monkey, Rabbit↔Rooster, Dragon↔Dog, Snake↔Pig
+   - Sign vs its clash = extra damage; matching a creature's harmony = bonus.
+4. **Two-sister Harmony Combos** — both sisters use signs from the same trine in one
+   turn -> big combo move. Rewards collecting complementary signs + the party model.
+
+Turn = pick sister -> pick zodiac move -> hit the beat -> damage scales with
+timing × zodiac matchup. Build toward Harmony Combos / ultimates.
 
 ### Zodiac powers do DOUBLE DUTY (field power + battle special)
 Each collected sign is both an exploration tool AND a battle move. More signs =
