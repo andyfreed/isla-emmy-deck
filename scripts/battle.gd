@@ -14,9 +14,15 @@ const CLASH := {
 
 var enemy_sign: String = "horse"
 
+const SIGN_EMOJI := {
+	"rat": "🐀", "ox": "🐂", "tiger": "🐅", "rabbit": "🐇", "dragon": "🐉",
+	"snake": "🐍", "horse": "🐎", "sheep": "🐑", "monkey": "🐒",
+	"rooster": "🐓", "dog": "🐕", "pig": "🐖",
+}
+
 var ui: CanvasLayer
 var msg: Label
-var menu_box: VBoxContainer
+var menu_box: Control
 var sisters: Array = []
 var enemy: Dictionary = {}
 var order: Array = []
@@ -55,7 +61,7 @@ func _ready() -> void:
 	enemy = _make_combatant("Grumblehoof", enemy_sign, 70, false,
 		"res://assets/enemies/grumpy.png", Vector2(390, 360), 300.0, false)
 	_make_bar(enemy, Vector2(255, 150), 250)
-	ui.add_child(_label("GRUMBLEHOOF", 22, Vector2(255, 118), false))
+	ui.add_child(_label("GRUMBLEHOOF  %s %s" % [SIGN_EMOJI.get(enemy_sign, ""), enemy_sign.to_upper()], 22, Vector2(255, 118), false))
 
 	var isla := _make_combatant("Isla", "rat", 48, true,
 		"res://assets/isla.png", Vector2(960, 420), 180.0, true)
@@ -79,8 +85,8 @@ func _ready() -> void:
 
 	order = [isla, emmy, enemy]
 
-	menu_box = VBoxContainer.new()
-	menu_box.position = Vector2(70, 470)
+	menu_box = Control.new()
+	menu_box.position = Vector2(0, 0)
 	ui.add_child(menu_box)
 
 	active_marker = _label("▼", 44, Vector2.ZERO, false)
@@ -94,10 +100,10 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	if state == "choosing":
-		if Input.is_action_just_pressed("ui_up"):
+		if Input.is_action_just_pressed("ui_left") or Input.is_action_just_pressed("ui_up"):
 			move_cursor = (move_cursor - 1 + actor["moves"].size()) % actor["moves"].size()
 			_refresh_menu()
-		elif Input.is_action_just_pressed("ui_down"):
+		elif Input.is_action_just_pressed("ui_right") or Input.is_action_just_pressed("ui_down"):
 			move_cursor = (move_cursor + 1) % actor["moves"].size()
 			_refresh_menu()
 	elif state == "rhythm":
@@ -148,7 +154,7 @@ func _next_turn() -> void:
 		state = "choosing"
 		move_cursor = 0
 		msg.add_theme_color_override("font_color", Color(1, 1, 1))
-		msg.text = actor["name"] + "'s turn — pick a move (A)"
+		msg.text = actor["name"] + "'s turn — choose a card!  (◀ ▶ then A)"
 		_show_active(actor)
 		_refresh_menu()
 	else:
@@ -211,17 +217,22 @@ func _resolve_move(c: Dictionary, move: Dictionary, mult: float, q: String) -> v
 
 	var clash: bool = CLASH.get(move["sign"], "") == enemy["sign"]
 	var total := 0
+	var big := clash or q == "PERFECT!"
+	var home: Vector2 = c["spr"].position
+	await _lunge_to(c["spr"], enemy["spr"].position + Vector2(190, 30))
 	for h in int(move["hits"]):
 		var dmg := int(move["power"] * mult * (1.5 if clash else 1.0))
-		await _hop(c["spr"])
+		await _strike(c["spr"])
 		enemy["hp"] = max(0, int(enemy["hp"]) - dmg)
 		total += dmg
 		_update_bar(enemy)
 		_flash_white(enemy["spr"])
-		var big := clash or q == "PERFECT!"
+		_scale_punch(enemy["spr"])
 		_popup_dmg(enemy["spr"].position, str(dmg), Color(1, 0.85, 0.2) if big else Color(1, 1, 1), big)
-		_shake_screen(11.0 if big else 5.0)
+		_shake_screen(16.0 if big else 8.0)
+		await get_tree().create_timer(0.08).timeout   # hit-stop beat
 		await _shake(enemy["spr"])
+	_lunge_back(c["spr"], home)
 	var txt := "%s — %s   (%d funk)" % [move["name"], q, total]
 	if clash:
 		txt += "    ⚡ ZODIAC CLASH! ×1.5"
@@ -242,13 +253,18 @@ func _enemy_turn() -> void:
 	msg.add_theme_color_override("font_color", Color(1, 1, 1))
 	msg.text = enemy["name"] + " grumbles angrily!"
 	await get_tree().create_timer(0.5).timeout
-	await _hop(enemy["spr"])
+	var ehome: Vector2 = enemy["spr"].position
+	await _lunge_to(enemy["spr"], t["spr"].position + Vector2(-200, -40))
 	var dmg := 7 + (randi() % 7)
 	t["hp"] = max(0, int(t["hp"]) - dmg)
 	_update_bar(t)
+	_flash_white(t["spr"])
+	_scale_punch(t["spr"])
 	_popup_dmg(t["spr"].position, str(dmg), Color(1, 0.5, 0.5), false)
-	_shake_screen(7.0)
+	_shake_screen(9.0)
+	await get_tree().create_timer(0.08).timeout
 	await _shake(t["spr"])
+	_lunge_back(enemy["spr"], ehome)
 	if int(t["hp"]) <= 0:
 		t["alive"] = false
 		t["spr"].modulate = Color(1, 1, 1, 0.4)
@@ -312,14 +328,67 @@ func _update_bar(c: Dictionary) -> void:
 func _refresh_menu() -> void:
 	_clear_menu()
 	var moves: Array = actor["moves"]
+	var cw := 196.0
+	var ch := 236.0
+	var gap := 22.0
+	var x0 := 64.0
 	for i in moves.size():
-		var l := Label.new()
-		l.text = ("> " if i == move_cursor else "   ") + str(moves[i]["name"])
-		l.add_theme_font_size_override("font_size", 30)
-		l.add_theme_color_override("font_color", Color(1, 1, 0.7) if i == move_cursor else Color(1, 1, 1))
-		l.add_theme_color_override("font_outline_color", Color(0, 0, 0))
-		l.add_theme_constant_override("outline_size", 5)
-		menu_box.add_child(l)
+		var m: Dictionary = moves[i]
+		var on := i == move_cursor
+		var card := Panel.new()
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(0.24, 0.5, 0.32) if m["kind"] == "heal" else Color(0.42, 0.28, 0.5)
+		if on:
+			sb.bg_color = sb.bg_color.lightened(0.22)
+		sb.set_corner_radius_all(16)
+		sb.border_color = Color(1, 0.95, 0.6) if on else Color(0.1, 0.08, 0.15)
+		sb.set_border_width_all(5 if on else 3)
+		card.add_theme_stylebox_override("panel", sb)
+		card.position = Vector2(x0 + i * (cw + gap), (500.0 if on else 540.0))
+		card.size = Vector2(cw, ch)
+		card.modulate = Color(1, 1, 1) if on else Color(0.82, 0.82, 0.85)
+		menu_box.add_child(card)
+
+		var nm := Label.new()
+		nm.text = str(m["name"])
+		nm.add_theme_font_size_override("font_size", 26)
+		nm.add_theme_color_override("font_color", Color(1, 1, 1))
+		nm.position = Vector2(0, 10)
+		nm.size = Vector2(cw, 34)
+		nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		card.add_child(nm)
+
+		var art := Label.new()
+		art.text = SIGN_EMOJI.get(m["sign"], "✨")
+		art.add_theme_font_size_override("font_size", 74)
+		art.position = Vector2(0, 52)
+		art.size = Vector2(cw, 96)
+		art.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		card.add_child(art)
+
+		var info := Label.new()
+		var hits := int(m["hits"])
+		if m["kind"] == "heal":
+			info.text = "heals %d" % int(m["power"])
+		elif hits > 1:
+			info.text = "%d × %d hits" % [int(m["power"]), hits]
+		else:
+			info.text = "power %d" % int(m["power"])
+		info.add_theme_font_size_override("font_size", 22)
+		info.add_theme_color_override("font_color", Color(1, 1, 0.75))
+		info.position = Vector2(0, 156)
+		info.size = Vector2(cw, 30)
+		info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		card.add_child(info)
+
+		var sign_l := Label.new()
+		sign_l.text = str(m["sign"]).to_upper()
+		sign_l.add_theme_font_size_override("font_size", 17)
+		sign_l.add_theme_color_override("font_color", Color(0.85, 0.8, 0.95))
+		sign_l.position = Vector2(0, 198)
+		sign_l.size = Vector2(cw, 24)
+		sign_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		card.add_child(sign_l)
 
 
 func _clear_menu() -> void:
@@ -336,6 +405,34 @@ func _clear_rhythm() -> void:
 	if rhythm_marker:
 		rhythm_marker.queue_free()
 		rhythm_marker = null
+
+
+func _lunge_to(spr: Sprite2D, target: Vector2) -> void:
+	var tw := create_tween()
+	tw.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	tw.tween_property(spr, "position", target, 0.16)
+	await tw.finished
+
+
+func _lunge_back(spr: Sprite2D, home: Vector2) -> void:
+	var tw := create_tween()
+	tw.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(spr, "position", home, 0.2)
+
+
+func _strike(spr: Sprite2D) -> void:
+	var base := spr.position
+	var tw := create_tween()
+	tw.tween_property(spr, "position", base + Vector2(-46, -14), 0.06)
+	tw.tween_property(spr, "position", base, 0.08)
+	await tw.finished
+
+
+func _scale_punch(spr: Sprite2D) -> void:
+	var base := spr.scale
+	var tw := create_tween()
+	tw.tween_property(spr, "scale", base * 1.16, 0.06)
+	tw.tween_property(spr, "scale", base, 0.14)
 
 
 func _hop(spr: Sprite2D) -> void:

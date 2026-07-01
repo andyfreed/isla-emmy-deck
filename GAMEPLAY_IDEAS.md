@@ -114,6 +114,16 @@ set). NOT the gritty Mewgenics end. Isla = blonde + pink overalls; Emmy = brunet
 
 ---
 
+## Playtest #1 feedback (Emmy + dad, 2026-07-01)
+- **Emmy: zodiac CARDS as attacks/abilities.** ADOPTED — moves are now cards you
+  flip through (◀ ▶) and play (A). Fits collection perfectly: calm a creature →
+  earn its card. Card art from art AI later (code-drawn placeholders for now).
+- **Emmy: enemies should look like realistic zodiac creatures** (majestic animals,
+  not blobs) — art request sent.
+- **Dad: hits underwhelming** → punch pass: attacker LUNGES to target, hit-stop,
+  scale-punch, bigger shake/numbers. Also bundled Baloo 2 as the game font.
+- Needs from art: rhythm-bar art, card frames, creature art.
+
 ## Locked decisions (so far)
 - Travel between islands = **hot-air balloon** (world map). LOCKED.
 - **Audio:** music = **Suno** (free tier ok, paid fine if needed); SFX = **ElevenLabs**
