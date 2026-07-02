@@ -41,11 +41,25 @@ jobs:
           chmod +x build/isla-emmy.x86_64
           ls -la build
 
+      - name: Export macOS build
+        run: |
+          ./godot --headless --path . --export-release "macOS" build/isla-emmy-mac.zip
+          ls -la build
+
+      - name: Package macOS launcher
+        run: |
+          chmod +x "mac/Isla & Emmy.app/Contents/MacOS/launcher"
+          (cd mac && zip -ry "../build/IslaEmmy-Mac.zip" "Isla & Emmy.app")
+          ls -la build
+
       - name: Publish "latest" release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
           name: Latest build
-          files: build/isla-emmy.x86_64
+          files: |
+            build/isla-emmy.x86_64
+            build/isla-emmy-mac.zip
+            build/IslaEmmy-Mac.zip
           make_latest: true
-          body: "Auto-built Linux/Steam Deck binary. The on-Deck launcher pulls this automatically."
+          body: "Auto-built binaries. Deck launcher pulls isla-emmy.x86_64; the Mac launcher app (IslaEmmy-Mac.zip, install once) pulls isla-emmy-mac.zip on every launch."
