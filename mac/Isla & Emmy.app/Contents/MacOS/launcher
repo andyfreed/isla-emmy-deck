@@ -11,9 +11,13 @@ URL="https://github.com/$REPO/releases/latest/download/isla-emmy-mac.zip"
 
 mkdir -p "$DIR"
 
-ZOPT=()
-[ -f "$ZIP" ] && ZOPT=(-z "$ZIP")            # only download if remote is newer
-if curl -fsL --connect-timeout 10 "${ZOPT[@]}" -o "$ZIP.new" "$URL" && [ -s "$ZIP.new" ]; then
+# only download if remote is newer (macOS bash 3.2: no empty-array expansion)
+if [ -f "$ZIP" ]; then
+    curl -fsL --connect-timeout 10 -z "$ZIP" -o "$ZIP.new" "$URL"
+else
+    curl -fsL --connect-timeout 10 -o "$ZIP.new" "$URL"
+fi
+if [ -s "$ZIP.new" ]; then
     mv "$ZIP.new" "$ZIP"
     rm -rf "$DIR/app"
     mkdir -p "$DIR/app"
