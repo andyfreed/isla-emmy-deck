@@ -80,19 +80,21 @@ func _ready() -> void:
 	_make_bar(enemy, Vector2(255, 150), 250)
 	ui.add_child(_label("GRUMBLEHOOF  %s %s" % [SIGN_EMOJI.get(enemy_sign, ""), enemy_sign.to_upper()], 22, Vector2(255, 118), false))
 
+	var ab := Globals.atk_bonus
+	var hb := Globals.heal_bonus
 	var isla := _make_combatant("Isla", "rat", 48, true,
 		"res://assets/isla.png", Vector2(960, 420), 180.0, true)
 	isla["moves"] = [
-		{"name": "Funk Jab", "sign": "rat", "power": 11, "hits": 1, "kind": "attack"},
-		{"name": "Nibble Flurry", "sign": "rat", "power": 5, "hits": 3, "kind": "attack"},
-		{"name": "Snack Share", "sign": "rat", "power": 16, "hits": 1, "kind": "heal"},
+		{"name": "Star Slash", "sign": "rat", "power": 11 + ab, "hits": 1, "kind": "attack"},
+		{"name": "Nibble Flurry", "sign": "rat", "power": 5 + ab, "hits": 3, "kind": "attack"},
+		{"name": "Snack Share", "sign": "rat", "power": 16 + hb, "hits": 1, "kind": "heal"},
 	]
 	var emmy := _make_combatant("Emmy", "monkey", 52, true,
 		"res://assets/emmy.png", Vector2(1115, 500), 180.0, true)
 	emmy["moves"] = [
-		{"name": "Funk Jab", "sign": "monkey", "power": 11, "hits": 1, "kind": "attack"},
-		{"name": "Silly Dance", "sign": "monkey", "power": 9, "hits": 1, "kind": "attack"},
-		{"name": "Snack Share", "sign": "monkey", "power": 16, "hits": 1, "kind": "heal"},
+		{"name": "Star Slash", "sign": "monkey", "power": 11 + ab, "hits": 1, "kind": "attack"},
+		{"name": "Silly Dance", "sign": "monkey", "power": 9 + ab, "hits": 1, "kind": "attack"},
+		{"name": "Snack Share", "sign": "monkey", "power": 16 + hb, "hits": 1, "kind": "heal"},
 	]
 	sisters = [isla, emmy]
 	_make_bar(isla, Vector2(60, 662), 280)
@@ -239,6 +241,7 @@ func _resolve_move(c: Dictionary, move: Dictionary, mult: float, q: String) -> v
 	await _lunge_to(c["spr"], enemy["spr"].position + Vector2(190, 30))
 	for h in int(move["hits"]):
 		var dmg := int(move["power"] * mult * (1.5 if clash else 1.0))
+		_sword_swing(c["spr"])
 		await _strike(c["spr"])
 		enemy["hp"] = max(0, int(enemy["hp"]) - dmg)
 		total += dmg
@@ -435,6 +438,24 @@ func _lunge_back(spr: Sprite2D, home: Vector2) -> void:
 	var tw := create_tween()
 	tw.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tw.tween_property(spr, "position", home, 0.2)
+
+
+func _sword_swing(spr: Sprite2D) -> void:
+	# the sword delivers the attack (Emmy's idea): swings in from over the
+	# sister's shoulder through the enemy, then fades
+	var sw := Sprite2D.new()
+	sw.texture = load("res://assets/ui/sword.png")
+	var sc := 130.0 / float(sw.texture.get_height())
+	sw.scale = Vector2(sc, sc)
+	sw.position = spr.position + Vector2(-70, -60)
+	sw.rotation = -2.4
+	sw.z_index = 55
+	ui.add_child(sw)
+	var tw := create_tween()
+	tw.tween_property(sw, "rotation", -0.6, 0.09).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.parallel().tween_property(sw, "position", spr.position + Vector2(-130, 10), 0.09)
+	tw.tween_property(sw, "modulate:a", 0.0, 0.16)
+	tw.tween_callback(sw.queue_free)
 
 
 func _strike(spr: Sprite2D) -> void:

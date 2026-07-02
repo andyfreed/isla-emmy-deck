@@ -124,6 +124,17 @@ set). NOT the gritty Mewgenics end. Isla = blonde + pink overalls; Emmy = brunet
   scale-punch, bigger shake/numbers. Also bundled Baloo 2 as the game font.
 - Needs from art: rhythm-bar art, card frames, creature art.
 
+## Playtest #2 feedback (Emmy + dad, 2026-07-01)
+- **Hits feel good now** ✅ (lunge + hit-stop pass worked)
+- **Emmy likes flipping through the cards** ✅ — cards CONFIRMED as the battle UI
+- **Emmy: a SWORD should deliver the attack** → ADOPTED: "Star Slash" — sword swings
+  in on every attack strike (placeholder star-sword art; real weapon art later)
+- **Emmy: upgrade attacks at the General Store** → ADOPTED: store now sells
+  "Sharpen Star Sword" (attack +2) and "Bigger Snacks" (heal +4), applied to cards
+- **OPEN: store currency.** Upgrades are FREE while testing. Dad says hold off on
+  presents-as-currency until Emmy decides what money should be (presents? coins?
+  stars? something she invents?). ASK EMMY.
+
 ## Locked decisions (so far)
 - Travel between islands = **hot-air balloon** (world map). LOCKED.
 - **Audio:** music = **Suno** (free tier ok, paid fine if needed); SFX = **ElevenLabs**

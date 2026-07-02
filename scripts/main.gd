@@ -33,6 +33,8 @@ var hud: CanvasLayer
 var prompt_label: Label
 var popup_label: Label
 var popup_t: float = 0.0
+var score_label: Label
+var present_nodes: Array[Sprite2D] = []
 
 # battle / transition
 var creature: Sprite2D
@@ -40,10 +42,12 @@ var battle_node: Node
 var flash_layer: CanvasLayer
 var flash_rect: ColorRect
 
-# pause / test menu
+# pause / test / store menu
 var menu_open: bool = false
+var menu_mode: String = "pause"     # "pause" or "store"
 var menu_layer: CanvasLayer
 var menu_vbox: VBoxContainer
+var menu_title: Label
 var menu_cursor: int = 0
 var menu_items: Array[String] = []
 
@@ -222,6 +226,15 @@ func _enter_village(hero: String) -> void:
 	world.add_child(_make_sprite("res://assets/home_island/store.png", store_pos, 440.0))
 	world.add_child(_make_sprite("res://assets/home_island/balloon_station.png", balloon_pos, 520.0))
 
+	# presents = currency, scattered around the village
+	present_nodes.clear()
+	for pp in [Vector2(1100, 900), Vector2(2200, 1100), Vector2(2850, 1400),
+			Vector2(900, 1550), Vector2(1700, 800), Vector2(2600, 550),
+			Vector2(1350, 1650), Vector2(3050, 950)]:
+		var pres := _make_sprite("res://assets/present.png", pp, 90.0)
+		world.add_child(pres)
+		present_nodes.append(pres)
+
 	player = Node2D.new()
 	player.position = spawn_pos
 	world.add_child(player)
@@ -239,6 +252,8 @@ func _enter_village(hero: String) -> void:
 	hud = CanvasLayer.new()
 	add_child(hud)
 	hud.add_child(_label("Home Village   (B = title,  ☰ = menu)", 22, Vector2(24, 18), false))
+	score_label = _label("🎁 %d" % Globals.presents, 30, Vector2(1130, 18), false)
+	hud.add_child(score_label)
 	prompt_label = _label("", 30, Vector2(0, 700), true)
 	prompt_label.add_theme_color_override("font_color", Color(1, 1, 1))
 	hud.add_child(prompt_label)
@@ -308,6 +323,18 @@ func _process(delta: float) -> void:
 		spr.position.y = -absf(s) * 3.0
 		spr.scale = player_base_scale * Vector2(1.0 + 0.03 * s, 1.0 - 0.03 * s)
 
+	# collect presents (currency)
+	var any_left := false
+	for p in present_nodes:
+		if p.visible and player.position.distance_to(p.position) < 75.0:
+			p.visible = false
+			Globals.presents += 1
+			score_label.text = "🎁 %d" % Globals.presents
+		any_left = any_left or p.visible
+	if not any_left:
+		for p in present_nodes:
+			p.visible = true
+
 	# interaction prompt
 	interact_target = ""
 	var ptxt := ""
@@ -325,7 +352,7 @@ func _inside(p: Vector2) -> bool:
 func _interact() -> void:
 	match interact_target:
 		"store":
-			_popup("The General Store is coming soon! 🛒")
+			_open_menu("store")
 		"balloon":
 			_popup("The balloon isn't fueled up yet — adventure soon! 🎈")
 
@@ -402,13 +429,11 @@ func _toggle_menu() -> void:
 		_open_menu()
 
 
-func _open_menu() -> void:
+func _open_menu(mode: String = "pause") -> void:
 	menu_open = true
+	menu_mode = mode
 	menu_cursor = 0
-	menu_items = ["Resume"]
-	if state == "play":
-		menu_items.append("Test Battle")
-	menu_items.append("Quit Game")
+	_build_menu_items()
 
 	menu_layer = CanvasLayer.new()
 	menu_layer.layer = 80
@@ -416,11 +441,32 @@ func _open_menu() -> void:
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.6); dim.size = SCREEN
 	menu_layer.add_child(dim)
-	menu_layer.add_child(_label("— MENU —", 44, Vector2(0, 230), true))
+	var title := "🛒  GENERAL STORE  🛒" if mode == "store" else "— MENU —"
+	menu_title = _label(title, 44, Vector2(0, 180), true)
+	menu_title.add_theme_color_override("font_color", Color(1, 1, 1))
+	menu_layer.add_child(menu_title)
+	if mode == "store":
+		var sub := _label("(upgrades are free while we test — currency TBD!)", 22, Vector2(0, 250), true)
+		sub.add_theme_color_override("font_color", Color(1, 1, 0.7))
+		menu_layer.add_child(sub)
 	menu_vbox = VBoxContainer.new()
-	menu_vbox.position = Vector2(SCREEN.x * 0.5 - 140, 340)
+	menu_vbox.position = Vector2(SCREEN.x * 0.5 - 280, 330)
 	menu_layer.add_child(menu_vbox)
 	_refresh_menu()
+
+
+func _build_menu_items() -> void:
+	if menu_mode == "store":
+		menu_items = [
+			"Sharpen Star Sword  (attack +2)   [Lv %d]" % Globals.sword_level,
+			"Bigger Snacks  (heal +4)   [+%d]" % Globals.heal_bonus,
+			"Leave",
+		]
+	else:
+		menu_items = ["Resume"]
+		if state == "play":
+			menu_items.append("Test Battle")
+		menu_items.append("Quit Game")
 
 
 func _close_menu() -> void:
@@ -443,6 +489,23 @@ func _refresh_menu() -> void:
 
 
 func _menu_select() -> void:
+	if menu_mode == "store":
+		match menu_cursor:
+			0:
+				Globals.atk_bonus += 2
+				Globals.sword_level += 1
+				_build_menu_items()
+				_refresh_menu()
+				_popup("Star Sword sharpened! ⚔ attack +2")
+			1:
+				Globals.heal_bonus += 4
+				_build_menu_items()
+				_refresh_menu()
+				_popup("Snacks upgraded! 🍪 heal +4")
+			2:
+				_close_menu()
+		return
+
 	var item := menu_items[menu_cursor]
 	_close_menu()
 	match item:
