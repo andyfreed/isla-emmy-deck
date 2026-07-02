@@ -303,7 +303,10 @@ func _finish(win: bool) -> void:
 		msg.add_theme_color_override("font_color", Color(0.6, 1, 0.7))
 		msg.text = "Grumblehoof is calm again! 🌙"
 		await _calm_sequence()
-		await get_tree().create_timer(0.6).timeout
+		var reward := 6 + randi() % 5
+		Globals.gold += reward
+		msg.text = "Calmed and home to the Moon!  +%d gold 🪙" % reward
+		await get_tree().create_timer(1.0).timeout
 	else:
 		msg.add_theme_color_override("font_color", Color(1, 0.7, 0.7))
 		msg.text = "Out of funk! You retreat to rest..."

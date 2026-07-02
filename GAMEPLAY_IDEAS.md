@@ -131,9 +131,10 @@ set). NOT the gritty Mewgenics end. Isla = blonde + pink overalls; Emmy = brunet
   in on every attack strike (placeholder star-sword art; real weapon art later)
 - **Emmy: upgrade attacks at the General Store** → ADOPTED: store now sells
   "Sharpen Star Sword" (attack +2) and "Bigger Snacks" (heal +4), applied to cards
-- **OPEN: store currency.** Upgrades are FREE while testing. Dad says hold off on
-  presents-as-currency until Emmy decides what money should be (presents? coins?
-  stars? something she invents?). ASK EMMY.
+- **Currency DECIDED (Emmy): GOLD 🪙** — earned by defeating (calming) enemies and
+  finding treasure chests around the world. Implemented: battle win = 6–10 gold,
+  chests (one-time, tucked at island edges) = 4–7 gold, store charges real prices
+  (sword 10g +5/level, snacks 8g). Presents remain a separate collectible.
 
 ## Locked decisions (so far)
 - Travel between islands = **hot-air balloon** (world map). LOCKED.

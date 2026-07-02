@@ -35,6 +35,7 @@ var popup_label: Label
 var popup_t: float = 0.0
 var score_label: Label
 var present_nodes: Array[Sprite2D] = []
+var chest_nodes: Array[Sprite2D] = []
 
 # battle / transition
 var creature: Sprite2D
@@ -235,6 +236,13 @@ func _enter_village(hero: String) -> void:
 		world.add_child(pres)
 		present_nodes.append(pres)
 
+	# treasure chests (gold!) tucked around the island edges — one-time finds
+	chest_nodes.clear()
+	for cp in [Vector2(560, 640), Vector2(3150, 700), Vector2(2450, 1680), Vector2(760, 1450)]:
+		var chest := _make_sprite("res://assets/ui/chest.png", cp, 95.0)
+		world.add_child(chest)
+		chest_nodes.append(chest)
+
 	player = Node2D.new()
 	player.position = spawn_pos
 	world.add_child(player)
@@ -252,8 +260,9 @@ func _enter_village(hero: String) -> void:
 	hud = CanvasLayer.new()
 	add_child(hud)
 	hud.add_child(_label("Home Village   (B = title,  ☰ = menu)", 22, Vector2(24, 18), false))
-	score_label = _label("🎁 %d" % Globals.presents, 30, Vector2(1130, 18), false)
+	score_label = _label("", 30, Vector2(1010, 18), false)
 	hud.add_child(score_label)
+	_update_hud_counts()
 	prompt_label = _label("", 30, Vector2(0, 700), true)
 	prompt_label.add_theme_color_override("font_color", Color(1, 1, 1))
 	hud.add_child(prompt_label)
@@ -323,17 +332,26 @@ func _process(delta: float) -> void:
 		spr.position.y = -absf(s) * 3.0
 		spr.scale = player_base_scale * Vector2(1.0 + 0.03 * s, 1.0 - 0.03 * s)
 
-	# collect presents (currency)
+	# collect presents (collectible, not money)
 	var any_left := false
 	for p in present_nodes:
 		if p.visible and player.position.distance_to(p.position) < 75.0:
 			p.visible = false
 			Globals.presents += 1
-			score_label.text = "🎁 %d" % Globals.presents
+			_update_hud_counts()
 		any_left = any_left or p.visible
 	if not any_left:
 		for p in present_nodes:
 			p.visible = true
+
+	# open treasure chests -> GOLD (one-time)
+	for ch in chest_nodes:
+		if ch.visible and player.position.distance_to(ch.position) < 80.0:
+			ch.visible = false
+			var loot := 4 + randi() % 4
+			Globals.gold += loot
+			_update_hud_counts()
+			_popup("Treasure!  +%d gold 🪙" % loot)
 
 	# interaction prompt
 	interact_target = ""
@@ -361,6 +379,11 @@ func _popup(text: String) -> void:
 	if popup_label:
 		popup_label.text = text
 		popup_t = 2.4
+
+
+func _update_hud_counts() -> void:
+	if is_instance_valid(score_label):
+		score_label.text = "🎁 %d    🪙 %d" % [Globals.presents, Globals.gold]
 
 
 func _reset_to_select() -> void:
@@ -393,6 +416,7 @@ func _on_battle_finished(_win: bool) -> void:
 	if is_instance_valid(player):
 		player.position = spawn_pos
 	state = "play"
+	_update_hud_counts()   # battle rewards gold on a win
 	await _flash_from_white()
 
 
@@ -445,22 +469,26 @@ func _open_menu(mode: String = "pause") -> void:
 	menu_title = _label(title, 44, Vector2(0, 180), true)
 	menu_title.add_theme_color_override("font_color", Color(1, 1, 1))
 	menu_layer.add_child(menu_title)
-	if mode == "store":
-		var sub := _label("(upgrades are free while we test — currency TBD!)", 22, Vector2(0, 250), true)
-		sub.add_theme_color_override("font_color", Color(1, 1, 0.7))
-		menu_layer.add_child(sub)
 	menu_vbox = VBoxContainer.new()
 	menu_vbox.position = Vector2(SCREEN.x * 0.5 - 280, 330)
 	menu_layer.add_child(menu_vbox)
 	_refresh_menu()
 
 
+func _sword_cost() -> int:
+	return 10 + (Globals.sword_level - 1) * 5   # gets pricier each level
+
+
+func _snack_cost() -> int:
+	return 8
+
+
 func _build_menu_items() -> void:
 	if menu_mode == "store":
 		menu_items = [
-			"Sharpen Star Sword  (attack +2)   [Lv %d]" % Globals.sword_level,
-			"Bigger Snacks  (heal +4)   [+%d]" % Globals.heal_bonus,
-			"Leave",
+			"Sharpen Star Sword  (+2 atk)  — %d 🪙   [Lv %d]" % [_sword_cost(), Globals.sword_level],
+			"Bigger Snacks  (+4 heal)  — %d 🪙" % _snack_cost(),
+			"Leave     (you have %d 🪙)" % Globals.gold,
 		]
 	else:
 		menu_items = ["Resume"]
@@ -492,16 +520,26 @@ func _menu_select() -> void:
 	if menu_mode == "store":
 		match menu_cursor:
 			0:
-				Globals.atk_bonus += 2
-				Globals.sword_level += 1
+				if Globals.gold >= _sword_cost():
+					Globals.gold -= _sword_cost()
+					Globals.atk_bonus += 2
+					Globals.sword_level += 1
+					_popup("Star Sword sharpened! ⚔ attack +2")
+				else:
+					_popup("Not enough gold! Calm creatures & find chests 🪙")
 				_build_menu_items()
 				_refresh_menu()
-				_popup("Star Sword sharpened! ⚔ attack +2")
+				_update_hud_counts()
 			1:
-				Globals.heal_bonus += 4
+				if Globals.gold >= _snack_cost():
+					Globals.gold -= _snack_cost()
+					Globals.heal_bonus += 4
+					_popup("Snacks upgraded! 🍪 heal +4")
+				else:
+					_popup("Not enough gold! Calm creatures & find chests 🪙")
 				_build_menu_items()
 				_refresh_menu()
-				_popup("Snacks upgraded! 🍪 heal +4")
+				_update_hud_counts()
 			2:
 				_close_menu()
 		return
