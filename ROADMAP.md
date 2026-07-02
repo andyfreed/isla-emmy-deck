@@ -25,6 +25,9 @@ about the CRITICAL PATH (the make-or-break work), not about banning fun.
 the target player — her reaction is the design data.)
 
 ## Parked until the gate passes (don't let these block the loop)
+- **iPad/iOS port** (user has Apple dev account + shipped iOS before; Godot exports
+  iOS; TestFlight = best auto-update). Needs: virtual-joystick touch controls +
+  local Xcode builds. Do AFTER the game is good — it's distribution, not game.
 - Mass-producing environment art (home-island ground/props can stay placeholder).
 - Final music & SFX (temp/placeholder only for now).
 - Building all 12 creatures / all islands (breadth before the loop is fun = the #1
