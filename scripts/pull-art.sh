@@ -21,5 +21,6 @@ copy() {  # $1 = source FINAL dir, $2 = destination in repo
 copy "$SRC/FINAL"              "$REPO/assets"              # characters + UI items
 copy "$SRC/home_island/FINAL"  "$REPO/assets/home_island"
 copy "$SRC/enemies/FINAL"      "$REPO/assets/enemies"     # Moon-zodiac creatures
+copy "$SRC/ui/FINAL"           "$REPO/assets/ui"          # battle/UI pieces
 copy "$SRC/steam/FINAL"        "$REPO/steam"              # store art (not in-world)
 echo "done — review with: git status"

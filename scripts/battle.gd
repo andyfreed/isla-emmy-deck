@@ -32,11 +32,11 @@ var actor: Dictionary = {}
 var move_cursor: int = 0
 var pending_move: Dictionary = {}
 
-var rhythm_marker: ColorRect
+var rhythm_marker: Sprite2D
 var rhythm_pos: float = 0.0
 var rhythm_vel: float = 1.7
-var rhythm_x: float = 360.0
-var rhythm_w: float = 560.0
+var rhythm_x: float = 200.0
+var rhythm_w: float = 880.0
 var active_marker: Label
 
 
@@ -76,7 +76,7 @@ func _ready() -> void:
 	ui.add_child(msg)
 
 	enemy = _make_combatant("Grumblehoof", enemy_sign, 70, false,
-		"res://assets/enemies/grumpy.png", Vector2(390, 360), 300.0, false)
+		"res://assets/enemies/horse.png", Vector2(390, 380), 400.0, false)
 	_make_bar(enemy, Vector2(255, 150), 250)
 	ui.add_child(_label("GRUMBLEHOOF  %s %s" % [SIGN_EMOJI.get(enemy_sign, ""), enemy_sign.to_upper()], 22, Vector2(255, 118), false))
 
@@ -187,21 +187,27 @@ func _start_rhythm() -> void:
 	_clear_menu()
 	rhythm_pos = 0.0
 	rhythm_vel = absf(rhythm_vel)
-	var y := 600.0
-	var track := ColorRect.new()
-	track.name = "rtrack"; track.color = Color(0, 0, 0, 0.5)
-	track.position = Vector2(rhythm_x, y); track.size = Vector2(rhythm_w, 40)
+	var y := 618.0
+	var sc := 900.0 / 1100.0
+	var track := Sprite2D.new()
+	track.name = "rtrack"
+	track.texture = load("res://assets/ui/rhythm_track.png")
+	track.position = Vector2(SCREEN.x * 0.5, y)
+	track.scale = Vector2(sc, sc)
 	ui.add_child(track)
-	var zw := rhythm_w * 0.18
-	var zone := ColorRect.new()
-	zone.name = "rzone"; zone.color = Color(0.3, 0.9, 0.5, 0.7)
-	zone.position = Vector2(rhythm_x + rhythm_w * 0.5 - zw * 0.5, y); zone.size = Vector2(zw, 40)
+	var zone := Sprite2D.new()
+	zone.name = "rzone"
+	zone.texture = load("res://assets/ui/rhythm_zone.png")
+	zone.position = Vector2(SCREEN.x * 0.5, y)
+	zone.scale = Vector2(sc, sc)
 	ui.add_child(zone)
-	rhythm_marker = ColorRect.new()
-	rhythm_marker.color = Color(1, 1, 1)
-	rhythm_marker.position = Vector2(rhythm_x, y - 6); rhythm_marker.size = Vector2(8, 52)
+	rhythm_marker = Sprite2D.new()
+	rhythm_marker.texture = load("res://assets/ui/rhythm_marker.png")
+	rhythm_marker.position = Vector2(rhythm_x, y)
+	rhythm_marker.scale = Vector2(sc, sc)
+	rhythm_marker.z_index = 5
 	ui.add_child(rhythm_marker)
-	msg.text = "Hit A in the green zone!"
+	msg.text = "Hit A in the glowing zone!"
 
 
 func _lock_rhythm() -> void:
@@ -351,45 +357,50 @@ func _update_bar(c: Dictionary) -> void:
 func _refresh_menu() -> void:
 	_clear_menu()
 	var moves: Array = actor["moves"]
-	var cw := 196.0
-	var ch := 236.0
+	var cw := 200.0
+	var ch := 280.0     # real card art is 600x840 (1:1.4)
 	var gap := 22.0
 	var x0 := 64.0
+	var ink := Color(0.32, 0.19, 0.10)   # dark ink on parchment
 	for i in moves.size():
 		var m: Dictionary = moves[i]
 		var on := i == move_cursor
-		var card := Panel.new()
-		var sb := StyleBoxFlat.new()
-		sb.bg_color = Color(0.24, 0.5, 0.32) if m["kind"] == "heal" else Color(0.42, 0.28, 0.5)
-		if on:
-			sb.bg_color = sb.bg_color.lightened(0.22)
-		sb.set_corner_radius_all(16)
-		sb.border_color = Color(1, 0.95, 0.6) if on else Color(0.1, 0.08, 0.15)
-		sb.set_border_width_all(5 if on else 3)
-		card.add_theme_stylebox_override("panel", sb)
-		card.position = Vector2(x0 + i * (cw + gap), (500.0 if on else 540.0))
+		var card := TextureRect.new()
+		card.texture = load("res://assets/ui/card_front.png")
+		card.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		card.stretch_mode = TextureRect.STRETCH_SCALE
+		card.position = Vector2(x0 + i * (cw + gap), (475.0 if on else 515.0))
 		card.size = Vector2(cw, ch)
-		card.modulate = Color(1, 1, 1) if on else Color(0.82, 0.82, 0.85)
+		card.modulate = Color(1, 1, 1) if on else Color(0.72, 0.7, 0.75)
 		menu_box.add_child(card)
 
-		var nm := Label.new()
+		var nm := Label.new()   # sits in the banner
 		nm.text = str(m["name"])
-		nm.add_theme_font_size_override("font_size", 26)
-		nm.add_theme_color_override("font_color", Color(1, 1, 1))
-		nm.position = Vector2(0, 10)
-		nm.size = Vector2(cw, 34)
+		nm.add_theme_font_size_override("font_size", 22)
+		nm.add_theme_color_override("font_color", ink)
+		nm.position = Vector2(0, 30)
+		nm.size = Vector2(cw, 30)
 		nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		card.add_child(nm)
 
-		var art := Label.new()
+		var art := Label.new()  # art window (real illustrations later)
 		art.text = SIGN_EMOJI.get(m["sign"], "✨")
-		art.add_theme_font_size_override("font_size", 74)
-		art.position = Vector2(0, 52)
-		art.size = Vector2(cw, 96)
+		art.add_theme_font_size_override("font_size", 78)
+		art.position = Vector2(0, 92)
+		art.size = Vector2(cw, 100)
 		art.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		card.add_child(art)
 
-		var info := Label.new()
+		var sign_l := Label.new()
+		sign_l.text = str(m["sign"]).to_upper()
+		sign_l.add_theme_font_size_override("font_size", 15)
+		sign_l.add_theme_color_override("font_color", Color(0.5, 0.35, 0.2))
+		sign_l.position = Vector2(0, 186)
+		sign_l.size = Vector2(cw, 22)
+		sign_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		card.add_child(sign_l)
+
+		var info := Label.new()  # bottom strip
 		var hits := int(m["hits"])
 		if m["kind"] == "heal":
 			info.text = "heals %d" % int(m["power"])
@@ -397,21 +408,12 @@ func _refresh_menu() -> void:
 			info.text = "%d × %d hits" % [int(m["power"]), hits]
 		else:
 			info.text = "power %d" % int(m["power"])
-		info.add_theme_font_size_override("font_size", 22)
-		info.add_theme_color_override("font_color", Color(1, 1, 0.75))
-		info.position = Vector2(0, 156)
-		info.size = Vector2(cw, 30)
+		info.add_theme_font_size_override("font_size", 19)
+		info.add_theme_color_override("font_color", ink)
+		info.position = Vector2(0, 229)
+		info.size = Vector2(cw, 26)
 		info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		card.add_child(info)
-
-		var sign_l := Label.new()
-		sign_l.text = str(m["sign"]).to_upper()
-		sign_l.add_theme_font_size_override("font_size", 17)
-		sign_l.add_theme_color_override("font_color", Color(0.85, 0.8, 0.95))
-		sign_l.position = Vector2(0, 198)
-		sign_l.size = Vector2(cw, 24)
-		sign_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		card.add_child(sign_l)
 
 
 func _clear_menu() -> void:

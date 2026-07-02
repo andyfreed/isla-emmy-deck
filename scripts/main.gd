@@ -239,7 +239,7 @@ func _enter_village(hero: String) -> void:
 	# treasure chests (gold!) tucked around the island edges — one-time finds
 	chest_nodes.clear()
 	for cp in [Vector2(560, 640), Vector2(3150, 700), Vector2(2450, 1680), Vector2(760, 1450)]:
-		var chest := _make_sprite("res://assets/ui/chest.png", cp, 95.0)
+		var chest := _make_sprite("res://assets/ui/chest.png", cp, 110.0)
 		world.add_child(chest)
 		chest_nodes.append(chest)
 
@@ -344,10 +344,11 @@ func _process(delta: float) -> void:
 		for p in present_nodes:
 			p.visible = true
 
-	# open treasure chests -> GOLD (one-time)
+	# open treasure chests -> GOLD (one-time; chest stays, opened)
 	for ch in chest_nodes:
-		if ch.visible and player.position.distance_to(ch.position) < 80.0:
-			ch.visible = false
+		if not ch.has_meta("opened") and player.position.distance_to(ch.position) < 80.0:
+			ch.set_meta("opened", true)
+			ch.texture = load("res://assets/ui/chest_open.png")
 			var loot := 4 + randi() % 4
 			Globals.gold += loot
 			_update_hud_counts()
