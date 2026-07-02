@@ -48,12 +48,29 @@ func _ready() -> void:
 	var bg := Sprite2D.new()
 	bg.texture = load("res://assets/island_bg.png")
 	bg.position = SCREEN * 0.5
-	bg.modulate = Color(0.55, 0.5, 0.68)
+	bg.modulate = Color(0.62, 0.5, 0.52)          # warm dusk (pastel-blue creatures pop)
 	ui.add_child(bg)
 	var tint := ColorRect.new()
-	tint.color = Color(0.14, 0.09, 0.24, 0.35)
+	tint.color = Color(0.2, 0.09, 0.16, 0.38)     # warm plum, not blue
 	tint.size = SCREEN
 	ui.add_child(tint)
+
+	# moon-glow halo behind the creature — guarantees contrast for any coat color
+	var glow_grad := Gradient.new()
+	glow_grad.colors = PackedColorArray([Color(1.0, 0.95, 0.78, 0.5), Color(1.0, 0.95, 0.78, 0.0)])
+	glow_grad.offsets = PackedFloat32Array([0.0, 1.0])
+	var glow_tex := GradientTexture2D.new()
+	glow_tex.width = 512
+	glow_tex.height = 512
+	glow_tex.fill = GradientTexture2D.FILL_RADIAL
+	glow_tex.fill_from = Vector2(0.5, 0.5)
+	glow_tex.fill_to = Vector2(0.98, 0.5)
+	glow_tex.gradient = glow_grad
+	var glow := Sprite2D.new()
+	glow.texture = glow_tex
+	glow.position = Vector2(390, 330)
+	glow.scale = Vector2(1.7, 1.7)
+	ui.add_child(glow)
 
 	msg = _label("A grumpy moon creature is causing trouble!", 30, Vector2(0, 26), true)
 	ui.add_child(msg)
