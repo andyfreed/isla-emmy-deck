@@ -39,6 +39,12 @@ var rhythm_x: float = 200.0
 var rhythm_w: float = 880.0
 var active_marker: Label
 
+# juice (art-AI suggestions): idle breathing + card deal-in
+var breathe_t: float = 0.0
+var enemy_base_scale: Vector2 = Vector2.ONE
+var punching: bool = false
+var deal_cards: bool = false
+
 
 func _ready() -> void:
 	ui = CanvasLayer.new()
@@ -77,6 +83,7 @@ func _ready() -> void:
 
 	enemy = _make_combatant("Grumblehoof", enemy_sign, 70, false,
 		"res://assets/enemies/horse.png", Vector2(390, 380), 400.0, false)
+	enemy_base_scale = enemy["spr"].scale
 	_make_bar(enemy, Vector2(255, 150), 250)
 	ui.add_child(_label("GRUMBLEHOOF  %s %s" % [SIGN_EMOJI.get(enemy_sign, ""), enemy_sign.to_upper()], 22, Vector2(255, 118), false))
 
@@ -118,6 +125,11 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	# horse idle breathing — subtle life while it stands (paused during hit punch)
+	if enemy.has("spr") and enemy.get("alive", false) and not punching:
+		breathe_t += delta
+		enemy["spr"].scale = enemy_base_scale * (1.0 + 0.018 * sin(breathe_t * 2.2))
+
 	if state == "choosing":
 		if Input.is_action_just_pressed("ui_left") or Input.is_action_just_pressed("ui_up"):
 			move_cursor = (move_cursor - 1 + actor["moves"].size()) % actor["moves"].size()
@@ -175,6 +187,7 @@ func _next_turn() -> void:
 		msg.add_theme_color_override("font_color", Color(1, 1, 1))
 		msg.text = actor["name"] + "'s turn — choose a card!  (◀ ▶ then A)"
 		_show_active(actor)
+		deal_cards = true
 		_refresh_menu()
 	else:
 		_hide_active()
@@ -256,6 +269,9 @@ func _resolve_move(c: Dictionary, move: Dictionary, mult: float, q: String) -> v
 		_scale_punch(enemy["spr"])
 		_popup_dmg(enemy["spr"].position, str(dmg), Color(1, 0.85, 0.2) if big else Color(1, 1, 1), big)
 		_shake_screen(16.0 if big else 8.0)
+		if big:   # sparkle burst on PERFECT / clash hits
+			for si in 6:
+				_sparkle(enemy["spr"].position)
 		await get_tree().create_timer(0.08).timeout   # hit-stop beat
 		await _shake(enemy["spr"])
 	_lunge_back(c["spr"], home)
@@ -369,10 +385,17 @@ func _refresh_menu() -> void:
 		card.texture = load("res://assets/ui/card_front.png")
 		card.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		card.stretch_mode = TextureRect.STRETCH_SCALE
-		card.position = Vector2(x0 + i * (cw + gap), (475.0 if on else 515.0))
+		var final_y := 475.0 if on else 515.0
+		card.position = Vector2(x0 + i * (cw + gap), final_y)
 		card.size = Vector2(cw, ch)
 		card.modulate = Color(1, 1, 1) if on else Color(0.72, 0.7, 0.75)
 		menu_box.add_child(card)
+		if deal_cards:   # deal-in: slide up from below with a little overshoot
+			card.position.y = 830.0
+			var tw := create_tween()
+			tw.tween_interval(0.06 * i)
+			tw.tween_property(card, "position:y", final_y, 0.28) \
+				.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 		var nm := Label.new()   # sits in the banner
 		nm.text = str(m["name"])
@@ -414,6 +437,7 @@ func _refresh_menu() -> void:
 		info.size = Vector2(cw, 26)
 		info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		card.add_child(info)
+	deal_cards = false
 
 
 func _clear_menu() -> void:
@@ -461,6 +485,9 @@ func _sword_swing(spr: Sprite2D) -> void:
 	tw.parallel().tween_property(sw, "position", spr.position + Vector2(-130, 10), 0.09)
 	tw.tween_property(sw, "modulate:a", 0.0, 0.16)
 	tw.tween_callback(sw.queue_free)
+	# star trail along the swing arc
+	for i in 3:
+		_sparkle(spr.position.lerp(spr.position + Vector2(-130, -30), (i + 1) / 3.0))
 
 
 func _strike(spr: Sprite2D) -> void:
@@ -472,10 +499,12 @@ func _strike(spr: Sprite2D) -> void:
 
 
 func _scale_punch(spr: Sprite2D) -> void:
-	var base := spr.scale
+	punching = true
+	var base := enemy_base_scale if spr == enemy.get("spr") else spr.scale
 	var tw := create_tween()
 	tw.tween_property(spr, "scale", base * 1.16, 0.06)
 	tw.tween_property(spr, "scale", base, 0.14)
+	tw.tween_callback(func(): punching = false)
 
 
 func _hop(spr: Sprite2D) -> void:

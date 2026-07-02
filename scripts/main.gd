@@ -344,11 +344,26 @@ func _process(delta: float) -> void:
 		for p in present_nodes:
 			p.visible = true
 
-	# open treasure chests -> GOLD (one-time; chest stays, opened)
+	# open treasure chests -> GOLD (one-time; pops open with a bounce + coin burst)
 	for ch in chest_nodes:
 		if not ch.has_meta("opened") and player.position.distance_to(ch.position) < 80.0:
 			ch.set_meta("opened", true)
 			ch.texture = load("res://assets/ui/chest_open.png")
+			var base := ch.scale
+			var tw := create_tween()
+			tw.tween_property(ch, "scale", base * 1.22, 0.10).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			tw.tween_property(ch, "scale", base, 0.14)
+			for i in 5:
+				var coin := Label.new()
+				coin.text = "🪙"
+				coin.add_theme_font_size_override("font_size", 30)
+				coin.position = ch.position + Vector2(randf_range(-30, 30), -60)
+				coin.z_index = 50
+				world.add_child(coin)
+				var ct := create_tween()
+				ct.tween_property(coin, "position:y", coin.position.y - randf_range(70, 130), 0.7)
+				ct.parallel().tween_property(coin, "modulate:a", 0.0, 0.7)
+				ct.tween_callback(coin.queue_free)
 			var loot := 4 + randi() % 4
 			Globals.gold += loot
 			_update_hud_counts()
