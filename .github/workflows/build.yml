@@ -56,17 +56,15 @@ jobs:
 
       - name: Materialize signing credentials
         env:
-          MACOS_P12_B64: ${{ secrets.MACOS_P12_B64 }}
-          MACOS_P12_PASSWORD: ${{ secrets.MACOS_P12_PASSWORD }}
+          MACOS_SIGN_PEM_B64: ${{ secrets.MACOS_SIGN_PEM_B64 }}
           ASC_KEY_P8_B64: ${{ secrets.ASC_KEY_P8_B64 }}
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
         run: |
           set -e
           mkdir -p "$HOME/signing"
-          echo "$MACOS_P12_B64" | base64 -d > "$HOME/signing/devid.p12"
+          echo "$MACOS_SIGN_PEM_B64" | base64 -d > "$HOME/signing/signing.pem"
           echo "$ASC_KEY_P8_B64" | base64 -d > "$HOME/signing/authkey.p8"
-          printf '%s' "$MACOS_P12_PASSWORD" > "$HOME/signing/p12pass.txt"
           rcodesign encode-app-store-connect-api-key -o "$HOME/signing/asc.json" \
             "$ASC_ISSUER_ID" "$ASC_KEY_ID" "$HOME/signing/authkey.p8"
 
@@ -79,9 +77,8 @@ jobs:
           APP="$(find macapp -maxdepth 1 -name '*.app' | head -1)"
           echo "signing: $APP"
           rcodesign sign \
-            --p12-file "$HOME/signing/devid.p12" \
-            --p12-password-file "$HOME/signing/p12pass.txt" \
-            --for-notarization \
+            --pem-file "$HOME/signing/signing.pem" \
+            --code-signature-flags runtime \
             "$APP"
           echo "notarizing (waits for Apple)..."
           rcodesign notary-submit --api-key-file "$HOME/signing/asc.json" --staple "$APP"
