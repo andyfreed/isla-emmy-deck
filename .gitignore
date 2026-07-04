@@ -5,3 +5,4 @@ export_presets.cfg.bak
 
 # OS
 .DS_Store
+export_credentials.cfg

@@ -41,7 +41,46 @@ jobs:
           chmod +x build/isla-emmy.x86_64
           ls -la build
 
-      - name: Export macOS build
+      - name: Install rcodesign (macOS signing from Linux)
+        run: |
+          set -e
+          V="0.29.0"
+          wget -q "https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F${V}/apple-codesign-${V}-x86_64-unknown-linux-musl.tar.gz"
+          tar xzf "apple-codesign-${V}-x86_64-unknown-linux-musl.tar.gz"
+          sudo mv "apple-codesign-${V}-x86_64-unknown-linux-musl/rcodesign" /usr/local/bin/rcodesign
+          rcodesign --version
+          # tell the Godot editor where rcodesign lives
+          mkdir -p "$HOME/.config/godot"
+          printf '[gd_resource type="EditorSettings" format=3]\n\n[resource]\nexport/macos/rcodesign = "/usr/local/bin/rcodesign"\n' \
+            > "$HOME/.config/godot/editor_settings-4.7.tres"
+
+      - name: Materialize signing credentials
+        env:
+          MACOS_P12_B64: ${{ secrets.MACOS_P12_B64 }}
+          MACOS_P12_PASSWORD: ${{ secrets.MACOS_P12_PASSWORD }}
+          ASC_KEY_P8_B64: ${{ secrets.ASC_KEY_P8_B64 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -e
+          mkdir -p "$HOME/signing"
+          echo "$MACOS_P12_B64" | base64 -d > "$HOME/signing/devid.p12"
+          echo "$ASC_KEY_P8_B64" | base64 -d > "$HOME/signing/authkey.p8"
+          cat > export_credentials.cfg <<EOF
+          [preset.1]
+
+          script_encryption_key=""
+
+          [preset.1.options]
+
+          codesign/certificate_file="$HOME/signing/devid.p12"
+          codesign/certificate_password="$MACOS_P12_PASSWORD"
+          notarization/api_uuid="$ASC_ISSUER_ID"
+          notarization/api_key="$HOME/signing/authkey.p8"
+          notarization/api_key_id="$ASC_KEY_ID"
+          EOF
+
+      - name: Export macOS build (signed + notarized)
         run: |
           ./godot --headless --path . --export-release "macOS" build/isla-emmy-mac.zip
           ls -la build

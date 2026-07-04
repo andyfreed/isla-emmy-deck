@@ -25,7 +25,10 @@ if [ -s "$ZIP.new" ]; then
     APP="$(/usr/bin/find "$DIR/app" -maxdepth 2 -name "*.app" -print -quit)"
     if [ -n "$APP" ]; then
         xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true
-        codesign --force --deep -s - "$APP" 2>/dev/null || true   # local ad-hoc sign
+        # keep a real Developer ID signature intact; ad-hoc sign only as fallback
+        if ! codesign --verify --deep "$APP" 2>/dev/null; then
+            codesign --force --deep -s - "$APP" 2>/dev/null || true
+        fi
         echo "$APP" > "$DIR/apppath"
     fi
 else
