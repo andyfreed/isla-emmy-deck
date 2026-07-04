@@ -66,24 +66,28 @@ jobs:
           mkdir -p "$HOME/signing"
           echo "$MACOS_P12_B64" | base64 -d > "$HOME/signing/devid.p12"
           echo "$ASC_KEY_P8_B64" | base64 -d > "$HOME/signing/authkey.p8"
-          cat > export_credentials.cfg <<EOF
-          [preset.1]
+          printf '%s' "$MACOS_P12_PASSWORD" > "$HOME/signing/p12pass.txt"
+          rcodesign encode-app-store-connect-api-key -o "$HOME/signing/asc.json" \
+            "$ASC_ISSUER_ID" "$ASC_KEY_ID" "$HOME/signing/authkey.p8"
 
-          script_encryption_key=""
-
-          [preset.1.options]
-
-          codesign/certificate_file="$HOME/signing/devid.p12"
-          codesign/certificate_password="$MACOS_P12_PASSWORD"
-          notarization/api_uuid="$ASC_ISSUER_ID"
-          notarization/api_key="$HOME/signing/authkey.p8"
-          notarization/api_key_id="$ASC_KEY_ID"
-          EOF
-
-      - name: Export macOS build (signed + notarized)
+      - name: Export macOS build, sign + notarize
         run: |
+          set -e
           ./godot --headless --path . --export-release "macOS" build/isla-emmy-mac.zip
-          ls -la build
+          cd build
+          unzip -q isla-emmy-mac.zip -d macapp
+          APP="$(find macapp -maxdepth 1 -name '*.app' | head -1)"
+          echo "signing: $APP"
+          rcodesign sign \
+            --p12-file "$HOME/signing/devid.p12" \
+            --p12-password-file "$HOME/signing/p12pass.txt" \
+            --for-notarization \
+            "$APP"
+          echo "notarizing (waits for Apple)..."
+          rcodesign notary-submit --api-key-file "$HOME/signing/asc.json" --staple "$APP"
+          rm isla-emmy-mac.zip
+          (cd macapp && zip -qry ../isla-emmy-mac.zip *.app)
+          ls -la
 
       - name: Package macOS launcher
         run: |
