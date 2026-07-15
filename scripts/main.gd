@@ -23,6 +23,7 @@ var player: Node2D
 var player_base_scale: Vector2 = Vector2.ONE
 var anim_t: float = 0.0
 var island_poly: PackedVector2Array
+var obstacles: Array[Dictionary] = []   # {c: base center, e: ellipse extents} — blocks walking
 var spawn_pos := Vector2(1750, 1500)
 var store_pos := Vector2(2560, 980)
 var balloon_pos := Vector2(1820, 470)
@@ -213,19 +214,27 @@ func _enter_village(hero: String) -> void:
 	edge.z_index = -9
 	world.add_child(edge)
 
+	obstacles.clear()
 	for tp in [Vector2(950, 720), Vector2(2750, 680), Vector2(1300, 1230),
 			Vector2(2300, 1360), Vector2(820, 1300), Vector2(2950, 1180),
 			Vector2(1520, 640), Vector2(2150, 860)]:
 		world.add_child(_make_sprite("res://assets/home_island/tree.png", tp, 330.0))
+		_add_obstacle(tp, Vector2(50, 24))          # trunk base only — canopy stays walk-behind
 	for bp in [Vector2(700, 980), Vector2(2600, 1480), Vector2(1150, 1520), Vector2(2880, 880)]:
 		world.add_child(_make_sprite("res://assets/home_island/bush.png", bp, 120.0))
+		_add_obstacle(bp, Vector2(48, 22))
 	for rp in [Vector2(1650, 1430), Vector2(2450, 760), Vector2(1000, 600)]:
 		world.add_child(_make_sprite("res://assets/home_island/rock.png", rp, 95.0))
+		_add_obstacle(rp, Vector2(44, 22))
 	world.add_child(_make_sprite("res://assets/home_island/well.png", Vector2(1500, 1100), 150.0))
+	_add_obstacle(Vector2(1500, 1100), Vector2(62, 30))
 	world.add_child(_make_sprite("res://assets/home_island/signpost.png", Vector2(1950, 1380), 140.0))
+	_add_obstacle(Vector2(1950, 1380), Vector2(22, 12))
 
 	world.add_child(_make_sprite("res://assets/home_island/store.png", store_pos, 440.0))
+	_add_obstacle(store_pos, Vector2(180, 65))
 	world.add_child(_make_sprite("res://assets/home_island/balloon_station.png", balloon_pos, 520.0))
+	_add_obstacle(balloon_pos, Vector2(150, 60))
 
 	# presents = currency, scattered around the village
 	present_nodes.clear()
@@ -313,11 +322,11 @@ func _process(delta: float) -> void:
 	var moving := dir.length() > 0.1
 	var move := dir * SPEED * delta
 	var here := player.position
-	if _inside(here + move):
+	if _can_walk(here + move):
 		player.position = here + move
-	elif _inside(here + Vector2(move.x, 0)):
+	elif _can_walk(here + Vector2(move.x, 0)):
 		player.position = here + Vector2(move.x, 0)
-	elif _inside(here + Vector2(0, move.y)):
+	elif _can_walk(here + Vector2(0, move.y)):
 		player.position = here + Vector2(0, move.y)
 
 	anim_t += delta * (10.0 if moving else 2.5)
@@ -332,17 +341,12 @@ func _process(delta: float) -> void:
 		spr.position.y = -absf(s) * 3.0
 		spr.scale = player_base_scale * Vector2(1.0 + 0.03 * s, 1.0 - 0.03 * s)
 
-	# collect presents (collectible, not money)
-	var any_left := false
+	# collect presents (collectible, not money; respawn only on re-entering the island)
 	for p in present_nodes:
 		if p.visible and player.position.distance_to(p.position) < 75.0:
 			p.visible = false
 			Globals.presents += 1
 			_update_hud_counts()
-		any_left = any_left or p.visible
-	if not any_left:
-		for p in present_nodes:
-			p.visible = true
 
 	# open treasure chests -> GOLD (one-time; pops open with a bounce + coin burst)
 	for ch in chest_nodes:
@@ -381,6 +385,22 @@ func _process(delta: float) -> void:
 
 func _inside(p: Vector2) -> bool:
 	return Geometry2D.is_point_in_polygon(p, island_poly)
+
+
+func _add_obstacle(c: Vector2, e: Vector2) -> void:
+	obstacles.append({"c": c, "e": e})
+
+
+func _blocked(p: Vector2) -> bool:
+	for o in obstacles:
+		var d: Vector2 = (p - o.c) / o.e
+		if d.length_squared() < 1.0:
+			return true
+	return false
+
+
+func _can_walk(p: Vector2) -> bool:
+	return _inside(p) and not _blocked(p)
 
 
 func _interact() -> void:
