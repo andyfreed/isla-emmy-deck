@@ -8,11 +8,12 @@ set -euo pipefail
 SRC="$HOME/Dropbox/Andy/funky_islands"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 
-copy() {  # $1 = source FINAL dir, $2 = destination in repo
-	if [ -d "$1" ] && ls "$1"/*.png >/dev/null 2>&1; then
+copy() {  # $1 = source FINAL dir, $2 = destination in repo, $3 = extension (default png)
+	local ext="${3:-png}"
+	if [ -d "$1" ] && ls "$1"/*."$ext" >/dev/null 2>&1; then
 		mkdir -p "$2"
-		cp "$1"/*.png "$2"/
-		echo "synced  $(ls "$1"/*.png | wc -l | tr -d ' ') file(s):  ${1#$SRC/} -> ${2#$REPO/}"
+		cp "$1"/*."$ext" "$2"/
+		echo "synced  $(ls "$1"/*."$ext" | wc -l | tr -d ' ') file(s):  ${1#$SRC/} -> ${2#$REPO/}"
 	else
 		echo "skip (none):  ${1#$SRC/}"
 	fi
@@ -23,4 +24,5 @@ copy "$SRC/home_island/FINAL"  "$REPO/assets/home_island"
 copy "$SRC/enemies/FINAL"      "$REPO/assets/enemies"     # Moon-zodiac creatures
 copy "$SRC/ui/FINAL"           "$REPO/assets/ui"          # battle/UI pieces
 copy "$SRC/steam/FINAL"        "$REPO/steam"              # store art (not in-world)
+copy "$SRC/audio/FINAL"        "$REPO/assets/audio" ogg   # music + SFX (.ogg only, .wav = master)
 echo "done — review with: git status"

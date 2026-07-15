@@ -38,6 +38,9 @@ var score_label: Label
 var present_nodes: Array[Sprite2D] = []
 var chest_nodes: Array[Sprite2D] = []
 
+# music
+var music: AudioStreamPlayer
+
 # battle / transition
 var creature: Sprite2D
 var battle_node: Node
@@ -182,6 +185,7 @@ func start_game(hero: String) -> void:
 func _enter_village(hero: String) -> void:
 	state = "play"
 	ui.queue_free()
+	_play_island_music()
 
 	_build_island_poly()
 
@@ -383,6 +387,26 @@ func _process(delta: float) -> void:
 	prompt_label.text = ptxt
 
 
+## Island theme: delivered as a true seamless loop (crossfade wrap), so we just
+## loop the stream — no fade/gap handling needed. Survives _reset_to_select's
+## child sweep by being recreated on demand.
+func _play_island_music() -> void:
+	if not is_instance_valid(music):
+		music = AudioStreamPlayer.new()
+		var stream := load("res://assets/audio/island_theme.ogg") as AudioStreamOggVorbis
+		stream.loop = true
+		music.stream = stream
+		music.volume_db = -6.0
+		add_child(music)
+	if not music.playing:
+		music.play()
+
+
+func _stop_island_music() -> void:
+	if is_instance_valid(music) and music.playing:
+		music.stop()
+
+
 func _inside(p: Vector2) -> bool:
 	return Geometry2D.is_point_in_polygon(p, island_poly)
 
@@ -435,6 +459,7 @@ func _reset_to_select() -> void:
 # ---------------------------------------------------------------- battle
 func _start_battle() -> void:
 	state = "battle"
+	_stop_island_music()
 	await _flash_to_white()
 	var b := BATTLE.instantiate()
 	b.enemy_sign = "horse"
@@ -452,6 +477,7 @@ func _on_battle_finished(_win: bool) -> void:
 	if is_instance_valid(player):
 		player.position = spawn_pos
 	state = "play"
+	_play_island_music()
 	_update_hud_counts()   # battle rewards gold on a win
 	await _flash_from_white()
 
