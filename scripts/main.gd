@@ -301,6 +301,11 @@ func _process(delta: float) -> void:
 		elif Input.is_action_just_pressed("ui_down"):
 			menu_cursor = (menu_cursor + 1) % menu_items.size()
 			_refresh_menu()
+		elif menu_mode == "settings" and menu_cursor < 2:
+			if Input.is_action_just_pressed("ui_right"):
+				_adjust_setting(menu_cursor, 1)
+			elif Input.is_action_just_pressed("ui_left"):
+				_adjust_setting(menu_cursor, -1)
 		return
 
 	if state == "select":
@@ -396,7 +401,8 @@ func _play_island_music() -> void:
 		var stream := load("res://assets/audio/island_theme.ogg") as AudioStreamOggVorbis
 		stream.loop = true
 		music.stream = stream
-		music.volume_db = -6.0
+		music.volume_db = -6.0   # base headroom under SFX; user level rides the Music bus
+		music.bus = "Music"
 		add_child(music)
 	if not music.playing:
 		music.play()
@@ -527,13 +533,21 @@ func _open_menu(mode: String = "pause") -> void:
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.6); dim.size = SCREEN
 	menu_layer.add_child(dim)
-	var title := "🛒  GENERAL STORE  🛒" if mode == "store" else "— MENU —"
+	var title := "— MENU —"
+	if mode == "store":
+		title = "🛒  GENERAL STORE  🛒"
+	elif mode == "settings":
+		title = "⚙  SETTINGS — AUDIO  ⚙"
 	menu_title = _label(title, 44, Vector2(0, 180), true)
 	menu_title.add_theme_color_override("font_color", Color(1, 1, 1))
 	menu_layer.add_child(menu_title)
 	menu_vbox = VBoxContainer.new()
 	menu_vbox.position = Vector2(SCREEN.x * 0.5 - 280, 330)
 	menu_layer.add_child(menu_vbox)
+	if mode == "settings":
+		var hint := _label("◀ ▶  adjust volume      Ⓐ on Back to return", 26, Vector2(0, 640), true)
+		hint.add_theme_color_override("font_color", Color(1, 1, 1, 0.8))
+		menu_layer.add_child(hint)
 	_refresh_menu()
 
 
@@ -552,11 +566,22 @@ func _build_menu_items() -> void:
 			"Bigger Snacks  (+4 heal)  — %d 🪙" % _snack_cost(),
 			"Leave     (you have %d 🪙)" % Globals.gold,
 		]
+	elif menu_mode == "settings":
+		menu_items = [
+			"Game Music     %s" % _slider_bar(Globals.music_volume),
+			"Sound Effects  %s" % _slider_bar(Globals.sfx_volume),
+			"Back",
+		]
 	else:
 		menu_items = ["Resume"]
 		if state == "play":
 			menu_items.append("Test Battle")
+		menu_items.append("Settings")
 		menu_items.append("Quit Game")
+
+
+func _slider_bar(v: int) -> String:
+	return "◀ %s%s ▶  %d" % ["█".repeat(v), "░".repeat(10 - v), v]
 
 
 func _close_menu() -> void:
@@ -578,7 +603,27 @@ func _refresh_menu() -> void:
 		menu_vbox.add_child(l)
 
 
+func _adjust_setting(row: int, dv: int) -> void:
+	if row == 0:
+		Globals.set_music_volume(Globals.music_volume + dv)
+	else:
+		Globals.set_sfx_volume(Globals.sfx_volume + dv)
+	_build_menu_items()
+	_refresh_menu()
+
+
 func _menu_select() -> void:
+	if menu_mode == "settings":
+		match menu_cursor:
+			0, 1:
+				# A / tap bumps the level, wrapping past max — keeps sliders touch-usable
+				var cur: int = Globals.music_volume if menu_cursor == 0 else Globals.sfx_volume
+				_adjust_setting(menu_cursor, -cur if cur >= 10 else 1)
+			2:
+				_close_menu()
+				_open_menu("pause")
+		return
+
 	if menu_mode == "store":
 		match menu_cursor:
 			0:
@@ -614,6 +659,8 @@ func _menu_select() -> void:
 		"Test Battle":
 			if state == "play":
 				_start_battle()
+		"Settings":
+			_open_menu("settings")
 		"Quit Game":
 			get_tree().quit()
 
