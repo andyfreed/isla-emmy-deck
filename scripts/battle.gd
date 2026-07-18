@@ -133,9 +133,11 @@ func _process(delta: float) -> void:
 	if state == "choosing":
 		if Input.is_action_just_pressed("ui_left") or Input.is_action_just_pressed("ui_up"):
 			move_cursor = (move_cursor - 1 + actor["moves"].size()) % actor["moves"].size()
+			Globals.play_sfx("ui")
 			_refresh_menu()
 		elif Input.is_action_just_pressed("ui_right") or Input.is_action_just_pressed("ui_down"):
 			move_cursor = (move_cursor + 1) % actor["moves"].size()
+			Globals.play_sfx("ui")
 			_refresh_menu()
 	elif state == "rhythm":
 		rhythm_pos += rhythm_vel * delta
@@ -164,6 +166,7 @@ func _input(event: InputEvent) -> void:
 			and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
 		confirm = true
 	if confirm:
+		Globals.play_sfx("ui")
 		if state == "choosing":
 			_start_rhythm()
 		elif state == "rhythm":
@@ -327,6 +330,7 @@ func _finish(win: bool) -> void:
 		await _calm_sequence()
 		var reward := 6 + randi() % 5
 		Globals.gold += reward
+		Globals.play_sfx("coin")
 		msg.text = "Calmed and home to the Moon!  +%d gold 🪙" % reward
 		await get_tree().create_timer(1.0).timeout
 	else:
@@ -472,6 +476,7 @@ func _lunge_back(spr: Sprite2D, home: Vector2) -> void:
 func _sword_swing(spr: Sprite2D) -> void:
 	# the sword delivers the attack (Emmy's idea): swings in from over the
 	# sister's shoulder through the enemy, then fades
+	Globals.play_sfx("sword")
 	var sw := Sprite2D.new()
 	sw.texture = load("res://assets/ui/sword.png")
 	var sc := 130.0 / float(sw.texture.get_height())

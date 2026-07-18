@@ -29,6 +29,14 @@ var store_pos := Vector2(2560, 980)
 var balloon_pos := Vector2(1820, 470)
 var interact_target: String = ""
 
+# store interior — one fixed screen-sized room, built lazily far east of the island.
+# Camera limits clamp to the room so it plays as a single non-scrolling screen.
+const SHOP_RECT := Rect2(4400, 600, 1280, 800)
+var shop_root: Node2D
+var in_shop: bool = false
+var shop_obstacles: Array[Dictionary] = []
+var transitioning: bool = false
+
 # hud
 var hud: CanvasLayer
 var prompt_label: Label
@@ -186,6 +194,10 @@ func _enter_village(hero: String) -> void:
 	state = "play"
 	ui.queue_free()
 	_play_island_music()
+	in_shop = false
+	transitioning = false
+	shop_root = null
+	shop_obstacles.clear()
 
 	_build_island_poly()
 
@@ -327,6 +339,9 @@ func _process(delta: float) -> void:
 		if popup_t <= 0.0:
 			popup_label.text = ""
 
+	if transitioning:
+		return
+
 	var dir := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
 	var moving := dir.length() > 0.1
 	var move := dir * SPEED * delta
@@ -337,6 +352,12 @@ func _process(delta: float) -> void:
 		player.position = here + Vector2(move.x, 0)
 	elif _can_walk(here + Vector2(0, move.y)):
 		player.position = here + Vector2(0, move.y)
+
+	# open doorway at the bottom of the shop: walk down through it to leave
+	if in_shop and player.position.y > SHOP_RECT.end.y - 32.0 \
+			and absf(player.position.x - (SHOP_RECT.position.x + SHOP_RECT.size.x * 0.5)) < 110.0:
+		_exit_shop()
+		return
 
 	anim_t += delta * (10.0 if moving else 2.5)
 	var s := sin(anim_t)
@@ -355,6 +376,7 @@ func _process(delta: float) -> void:
 		if p.visible and player.position.distance_to(p.position) < 75.0:
 			p.visible = false
 			Globals.presents += 1
+			Globals.play_sfx("coin")
 			_update_hud_counts()
 
 	# open treasure chests -> GOLD (one-time; pops open with a bounce + coin burst)
@@ -362,6 +384,8 @@ func _process(delta: float) -> void:
 		if not ch.has_meta("opened") and player.position.distance_to(ch.position) < 80.0:
 			ch.set_meta("opened", true)
 			ch.texture = load("res://assets/ui/chest_open.png")
+			Globals.play_sfx("chest")
+			Globals.play_sfx("coin")
 			var base := ch.scale
 			var tw := create_tween()
 			tw.tween_property(ch, "scale", base * 1.22, 0.10).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
@@ -385,7 +409,12 @@ func _process(delta: float) -> void:
 	# interaction prompt
 	interact_target = ""
 	var ptxt := ""
-	if player.position.distance_to(store_pos) < 150.0:
+	if in_shop:
+		if player.position.distance_to(SHOP_RECT.position + Vector2(640, 470)) < 140.0:
+			interact_target = "counter"; ptxt = "Ⓐ  Shop with Grandpa"
+		elif player.position.distance_to(SHOP_RECT.position + Vector2(280, 440)) < 130.0:
+			interact_target = "cards"; ptxt = "Ⓐ  Zodiac Cards"
+	elif player.position.distance_to(store_pos) < 150.0:
 		interact_target = "store"; ptxt = "Ⓐ  General Store"
 	elif player.position.distance_to(balloon_pos) < 180.0:
 		interact_target = "balloon"; ptxt = "Ⓐ  Launch Balloon"
@@ -422,7 +451,8 @@ func _add_obstacle(c: Vector2, e: Vector2) -> void:
 
 
 func _blocked(p: Vector2) -> bool:
-	for o in obstacles:
+	var obs: Array[Dictionary] = shop_obstacles if in_shop else obstacles
+	for o in obs:
 		var d: Vector2 = (p - o.c) / o.e
 		if d.length_squared() < 1.0:
 			return true
@@ -430,15 +460,116 @@ func _blocked(p: Vector2) -> bool:
 
 
 func _can_walk(p: Vector2) -> bool:
+	if in_shop:
+		# inside the room: below the back wall, inset from the side/bottom edges
+		return Rect2(SHOP_RECT.position.x + 30.0, SHOP_RECT.position.y + 320.0,
+				SHOP_RECT.size.x - 60.0, SHOP_RECT.size.y - 340.0).has_point(p) and not _blocked(p)
 	return _inside(p) and not _blocked(p)
 
 
 func _interact() -> void:
+	if transitioning:
+		return
 	match interact_target:
 		"store":
+			_enter_shop()
+		"counter":
+			Globals.play_sfx("ui")
 			_open_menu("store")
+		"cards":
+			Globals.play_sfx("ui")
+			_popup("Zodiac cards coming soon — Grandpa's still stocking the display! 🌙")
 		"balloon":
 			_popup("The balloon isn't fueled up yet — adventure soon! 🎈")
+
+
+# ---------------------------------------------------------------- store interior
+## Build the walk-in shop per the art kit: seamless floor, wall band across the
+## top, Grandpa behind the counter, card display + shelf, moose head hung flat
+## on the back wall, rug as the doormat marking the open exit doorway (bottom).
+func _build_shop() -> void:
+	shop_root = Node2D.new()
+	shop_root.y_sort_enabled = true   # merges with world's Y-sort pool
+	world.add_child(shop_root)
+	shop_obstacles.clear()
+
+	var o := SHOP_RECT.position
+	var flr := Polygon2D.new()
+	flr.polygon = PackedVector2Array([o, o + Vector2(SHOP_RECT.size.x, 0),
+			o + SHOP_RECT.size, o + Vector2(0, SHOP_RECT.size.y)])
+	flr.texture = load("res://assets/store/floor.png")
+	flr.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+	flr.texture_scale = Vector2(2, 2)
+	flr.z_index = -8
+	shop_root.add_child(flr)
+
+	var wt := load("res://assets/store/wall.png") as Texture2D
+	var wall_h := 300.0
+	var tile_w := wt.get_width() * (wall_h / wt.get_height())
+	for i in int(ceil(SHOP_RECT.size.x / tile_w)):
+		var w := _make_sprite("res://assets/store/wall.png",
+				o + Vector2(tile_w * (i + 0.5), wall_h), wall_h)
+		w.z_index = -3   # out of Y-sort so wall-mounted decor can layer on it
+		shop_root.add_child(w)
+
+	# moose trophy hangs flat on the back wall, above/behind Grandpa's head
+	var moose := _make_sprite("res://assets/store/moose_head.png", o + Vector2(640, 270), 150.0)
+	moose.z_index = -2
+	shop_root.add_child(moose)
+
+	var mat := _make_sprite("res://assets/store/rug.png", o + Vector2(640, 790), 150.0)
+	mat.z_index = -1   # flat on the floor — never overlaps feet
+	shop_root.add_child(mat)
+
+	shop_root.add_child(_make_sprite("res://assets/store/clerk.png", o + Vector2(640, 360), 200.0))
+	_add_shop_obstacle(o + Vector2(640, 360), Vector2(50, 22))
+	shop_root.add_child(_make_sprite("res://assets/store/counter.png", o + Vector2(640, 415), 200.0))
+	_add_shop_obstacle(o + Vector2(640, 415), Vector2(130, 38))
+	shop_root.add_child(_make_sprite("res://assets/store/card_display.png", o + Vector2(280, 410), 200.0))
+	_add_shop_obstacle(o + Vector2(280, 410), Vector2(78, 32))
+	shop_root.add_child(_make_sprite("res://assets/store/shelf.png", o + Vector2(1000, 400), 210.0))
+	_add_shop_obstacle(o + Vector2(1000, 400), Vector2(80, 30))
+	shop_root.add_child(_make_sprite("res://assets/store/lamp.png", o + Vector2(90, 380), 210.0))
+	_add_shop_obstacle(o + Vector2(90, 380), Vector2(26, 14))
+	shop_root.add_child(_make_sprite("res://assets/store/plant.png", o + Vector2(105, 690), 135.0))
+	_add_shop_obstacle(o + Vector2(105, 690), Vector2(34, 18))
+	shop_root.add_child(_make_sprite("res://assets/store/crate.png", o + Vector2(1170, 680), 115.0))
+	_add_shop_obstacle(o + Vector2(1170, 680), Vector2(52, 26))
+
+
+func _add_shop_obstacle(c: Vector2, e: Vector2) -> void:
+	shop_obstacles.append({"c": c, "e": e})
+
+
+func _enter_shop() -> void:
+	transitioning = true
+	await _flash_to_white()
+	if not is_instance_valid(shop_root):
+		_build_shop()
+	in_shop = true
+	player.position = SHOP_RECT.position + Vector2(640, 715)   # just inside the doorway
+	camera.limit_left = int(SHOP_RECT.position.x)
+	camera.limit_top = int(SHOP_RECT.position.y)
+	camera.limit_right = int(SHOP_RECT.end.x)
+	camera.limit_bottom = int(SHOP_RECT.end.y)
+	camera.reset_smoothing()
+	_popup("Grandpa:  Well hello, %s!  Come on in! 💛" % Globals.hero.capitalize())
+	await _flash_from_white()
+	transitioning = false
+
+
+func _exit_shop() -> void:
+	transitioning = true
+	await _flash_to_white()
+	in_shop = false
+	player.position = store_pos + Vector2(0, 110)   # back out front of the store
+	camera.limit_left = -10000000
+	camera.limit_top = -10000000
+	camera.limit_right = 10000000
+	camera.limit_bottom = 10000000
+	camera.reset_smoothing()
+	await _flash_from_white()
+	transitioning = false
 
 
 func _popup(text: String) -> void:
@@ -482,6 +613,14 @@ func _on_battle_finished(_win: bool) -> void:
 		battle_node = null
 	if is_instance_valid(player):
 		player.position = spawn_pos
+	if in_shop:   # battles dump you back outside — unwind the shop camera/walk state
+		in_shop = false
+		camera.limit_left = -10000000
+		camera.limit_top = -10000000
+		camera.limit_right = 10000000
+		camera.limit_bottom = 10000000
+	if is_instance_valid(camera):
+		camera.reset_smoothing()
 	state = "play"
 	_play_island_music()
 	_update_hud_counts()   # battle rewards gold on a win
@@ -515,6 +654,7 @@ func _flash_from_white() -> void:
 
 # ---------------------------------------------------------------- test / pause menu
 func _toggle_menu() -> void:
+	Globals.play_sfx("ui")
 	if menu_open:
 		_close_menu()
 	else:
@@ -535,7 +675,7 @@ func _open_menu(mode: String = "pause") -> void:
 	menu_layer.add_child(dim)
 	var title := "— MENU —"
 	if mode == "store":
-		title = "🛒  GENERAL STORE  🛒"
+		title = "🛒  GRANDPA'S GENERAL STORE  🛒"
 	elif mode == "settings":
 		title = "⚙  SETTINGS — AUDIO  ⚙"
 	menu_title = _label(title, 44, Vector2(0, 180), true)
@@ -608,11 +748,14 @@ func _adjust_setting(row: int, dv: int) -> void:
 		Globals.set_music_volume(Globals.music_volume + dv)
 	else:
 		Globals.set_sfx_volume(Globals.sfx_volume + dv)
+	Globals.play_sfx("ui")   # doubles as a live preview of the SFX level
 	_build_menu_items()
 	_refresh_menu()
 
 
 func _menu_select() -> void:
+	if not (menu_mode == "settings" and menu_cursor < 2):
+		Globals.play_sfx("ui")   # slider rows chirp via _adjust_setting instead
 	if menu_mode == "settings":
 		match menu_cursor:
 			0, 1:
@@ -631,6 +774,7 @@ func _menu_select() -> void:
 					Globals.gold -= _sword_cost()
 					Globals.atk_bonus += 2
 					Globals.sword_level += 1
+					Globals.play_sfx("coin")
 					_popup("Star Sword sharpened! ⚔ attack +2")
 				else:
 					_popup("Not enough gold! Calm creatures & find chests 🪙")
@@ -641,6 +785,7 @@ func _menu_select() -> void:
 				if Globals.gold >= _snack_cost():
 					Globals.gold -= _snack_cost()
 					Globals.heal_bonus += 4
+					Globals.play_sfx("coin")
 					_popup("Snacks upgraded! 🍪 heal +4")
 				else:
 					_popup("Not enough gold! Calm creatures & find chests 🪙")

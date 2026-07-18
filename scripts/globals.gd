@@ -16,6 +16,22 @@ var sword_level: int = 1
 const SETTINGS_PATH := "user://settings.cfg"
 var music_volume: int = 8
 var sfx_volume: int = 8
+var _sfx_cache: Dictionary = {}
+
+
+## Fire-and-forget one-shot on the SFX bus (delivered files: sfx_<name>.ogg).
+func play_sfx(sfx: String) -> void:
+	var path := "res://assets/audio/sfx_%s.ogg" % sfx
+	if not _sfx_cache.has(path):
+		if not ResourceLoader.exists(path):
+			return
+		_sfx_cache[path] = load(path)
+	var p := AudioStreamPlayer.new()
+	p.stream = _sfx_cache[path]
+	p.bus = "SFX"
+	add_child(p)
+	p.finished.connect(p.queue_free)
+	p.play()
 
 
 func _ready() -> void:
