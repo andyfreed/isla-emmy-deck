@@ -66,7 +66,28 @@ var menu_items: Array[String] = []
 
 
 func _ready() -> void:
+	var args := OS.get_cmdline_user_args()
+	if OS.is_debug_build() and args.has("--shop"):
+		_debug_jump_shop(args)
+		return
 	show_select()
+
+
+## Layout iteration aid (debug builds only, inert in releases):
+##   godot --path . -- --shop [--shot=/abs/out.png]
+## boots straight into the store interior, optionally saves a screenshot + quits.
+func _debug_jump_shop(args: PackedStringArray) -> void:
+	Globals.hero = "isla"
+	pending_hero = "isla"
+	ui = CanvasLayer.new()   # _enter_village expects one to free
+	add_child(ui)
+	_enter_village("isla")
+	await _enter_shop()
+	for a in args:
+		if a.begins_with("--shot="):
+			await get_tree().create_timer(0.6).timeout
+			get_viewport().get_texture().get_image().save_png(a.trim_prefix("--shot="))
+			get_tree().quit()
 
 
 # ---------------------------------------------------------------- select
@@ -412,7 +433,7 @@ func _process(delta: float) -> void:
 	if in_shop:
 		if player.position.distance_to(SHOP_RECT.position + Vector2(640, 470)) < 140.0:
 			interact_target = "counter"; ptxt = "Ⓐ  Shop with Grandpa"
-		elif player.position.distance_to(SHOP_RECT.position + Vector2(280, 440)) < 130.0:
+		elif player.position.distance_to(SHOP_RECT.position + Vector2(240, 400)) < 130.0:
 			interact_target = "cards"; ptxt = "Ⓐ  Zodiac Cards"
 	elif player.position.distance_to(store_pos) < 150.0:
 		interact_target = "store"; ptxt = "Ⓐ  General Store"
@@ -506,35 +527,59 @@ func _build_shop() -> void:
 	var wt := load("res://assets/store/wall.png") as Texture2D
 	var wall_h := 300.0
 	var tile_w := wt.get_width() * (wall_h / wt.get_height())
-	for i in int(ceil(SHOP_RECT.size.x / tile_w)):
+	var step := tile_w - 2.0   # 2px overlap hides the hairline seam at tile edges
+	for i in int(ceil(SHOP_RECT.size.x / step)):
 		var w := _make_sprite("res://assets/store/wall.png",
-				o + Vector2(tile_w * (i + 0.5), wall_h), wall_h)
+				o + Vector2(step * (i + 0.5), wall_h), wall_h)
 		w.z_index = -3   # out of Y-sort so wall-mounted decor can layer on it
 		shop_root.add_child(w)
 
-	# moose trophy hangs flat on the back wall, above/behind Grandpa's head
-	var moose := _make_sprite("res://assets/store/moose_head.png", o + Vector2(640, 270), 150.0)
+	# --- wall-mounted (z -2: over the wall, under everyone on the floor) ---
+	# moose trophy centered high on the wall, clear of Grandpa's head
+	var moose := _make_sprite("res://assets/store/moose_head.png", o + Vector2(640, 170), 150.0)
 	moose.z_index = -2
 	shop_root.add_child(moose)
+	# the lamp art is a lantern — hang one near each end of the wall
+	for lx in [70.0, 1210.0]:
+		var lantern := _make_sprite("res://assets/store/lamp.png", o + Vector2(lx, 220), 190.0)
+		lantern.z_index = -2
+		shop_root.add_child(lantern)
 
-	var mat := _make_sprite("res://assets/store/rug.png", o + Vector2(640, 790), 150.0)
-	mat.z_index = -1   # flat on the floor — never overlaps feet
+	# --- rugs (z -1: flat on the floor) — big center carpet + doormat at the exit ---
+	var carpet := _make_sprite("res://assets/store/rug.png", o + Vector2(640, 700), 440.0)
+	carpet.z_index = -1
+	shop_root.add_child(carpet)
+	var mat := _make_sprite("res://assets/store/rug.png", o + Vector2(640, 798), 130.0)
+	mat.z_index = -1
 	shop_root.add_child(mat)
 
-	shop_root.add_child(_make_sprite("res://assets/store/clerk.png", o + Vector2(640, 360), 200.0))
-	_add_shop_obstacle(o + Vector2(640, 360), Vector2(50, 22))
-	shop_root.add_child(_make_sprite("res://assets/store/counter.png", o + Vector2(640, 415), 200.0))
-	_add_shop_obstacle(o + Vector2(640, 415), Vector2(130, 38))
-	shop_root.add_child(_make_sprite("res://assets/store/card_display.png", o + Vector2(280, 410), 200.0))
-	_add_shop_obstacle(o + Vector2(280, 410), Vector2(78, 32))
-	shop_root.add_child(_make_sprite("res://assets/store/shelf.png", o + Vector2(1000, 400), 210.0))
-	_add_shop_obstacle(o + Vector2(1000, 400), Vector2(80, 30))
-	shop_root.add_child(_make_sprite("res://assets/store/lamp.png", o + Vector2(90, 380), 210.0))
-	_add_shop_obstacle(o + Vector2(90, 380), Vector2(26, 14))
-	shop_root.add_child(_make_sprite("res://assets/store/plant.png", o + Vector2(105, 690), 135.0))
-	_add_shop_obstacle(o + Vector2(105, 690), Vector2(34, 18))
-	shop_root.add_child(_make_sprite("res://assets/store/crate.png", o + Vector2(1170, 680), 115.0))
-	_add_shop_obstacle(o + Vector2(1170, 680), Vector2(52, 26))
+	# --- counter island: Grandpa behind the desk, register side toward him ---
+	shop_root.add_child(_make_sprite("res://assets/store/clerk.png", o + Vector2(640, 355), 220.0))
+	_add_shop_obstacle(o + Vector2(640, 355), Vector2(55, 24))
+	shop_root.add_child(_make_sprite("res://assets/store/counter.png", o + Vector2(640, 445), 240.0))
+	_add_shop_obstacle(o + Vector2(640, 445), Vector2(158, 45))
+
+	# --- furniture against the back wall (bases just under the wall band) ---
+	shop_root.add_child(_make_sprite("res://assets/store/card_display.png", o + Vector2(240, 350), 260.0))
+	_add_shop_obstacle(o + Vector2(240, 350), Vector2(85, 32))
+	shop_root.add_child(_make_sprite("res://assets/store/shelf.png", o + Vector2(1050, 340), 290.0))
+	_add_shop_obstacle(o + Vector2(1050, 340), Vector2(95, 32))
+
+	# --- stock + greenery filling the open floor ---
+	shop_root.add_child(_make_sprite("res://assets/store/crate.png", o + Vector2(395, 505), 125.0))
+	_add_shop_obstacle(o + Vector2(395, 505), Vector2(56, 26))
+	var crate2 := _make_sprite("res://assets/store/crate.png", o + Vector2(925, 550), 115.0)
+	crate2.flip_h = true
+	shop_root.add_child(crate2)
+	_add_shop_obstacle(o + Vector2(925, 550), Vector2(52, 24))
+	for b in [[1180.0, 690.0, 150.0, 55.0, 28.0], [1080.0, 750.0, 135.0, 50.0, 25.0]]:
+		shop_root.add_child(_make_sprite("res://assets/home_island/barrel.png",
+				o + Vector2(b[0], b[1]), b[2]))
+		_add_shop_obstacle(o + Vector2(b[0], b[1]), Vector2(b[3], b[4]))
+	shop_root.add_child(_make_sprite("res://assets/store/plant.png", o + Vector2(80, 760), 170.0))
+	_add_shop_obstacle(o + Vector2(80, 760), Vector2(40, 20))
+	shop_root.add_child(_make_sprite("res://assets/store/plant.png", o + Vector2(1220, 450), 160.0))
+	_add_shop_obstacle(o + Vector2(1220, 450), Vector2(38, 19))
 
 
 func _add_shop_obstacle(c: Vector2, e: Vector2) -> void:
