@@ -397,7 +397,7 @@ func _process(delta: float) -> void:
 		if p.visible and player.position.distance_to(p.position) < 75.0:
 			p.visible = false
 			Globals.presents += 1
-			Globals.play_sfx("coin")
+			Globals.play_sfx("gift")
 			_update_hud_counts()
 
 	# open treasure chests -> GOLD (one-time; pops open with a bounce + coin burst)
@@ -442,25 +442,34 @@ func _process(delta: float) -> void:
 	prompt_label.text = ptxt
 
 
-## Island theme: delivered as a true seamless loop (crossfade wrap), so we just
-## loop the stream — no fade/gap handling needed. Survives _reset_to_select's
-## child sweep by being recreated on demand.
-func _play_island_music() -> void:
-	if not is_instance_valid(music):
-		music = AudioStreamPlayer.new()
-		var stream := load("res://assets/audio/island_theme.ogg") as AudioStreamOggVorbis
-		stream.loop = true
+## All tracks are delivered as true seamless loops (crossfade wrap), so we just
+## loop the stream — no fade/gap handling needed. One shared player; it survives
+## _reset_to_select's child sweep by being recreated on demand.
+func _ensure_music() -> void:
+	if is_instance_valid(music):
+		return
+	music = AudioStreamPlayer.new()
+	music.volume_db = -6.0   # base headroom under SFX; user level rides the Music bus
+	music.bus = "Music"
+	add_child(music)
+
+
+func _play_music(path: String) -> void:
+	_ensure_music()
+	var stream := load(path) as AudioStreamOggVorbis
+	stream.loop = true
+	if music.stream != stream or not music.playing:
 		music.stream = stream
-		music.volume_db = -6.0   # base headroom under SFX; user level rides the Music bus
-		music.bus = "Music"
-		add_child(music)
-	if not music.playing:
 		music.play()
 
 
-func _stop_island_music() -> void:
-	if is_instance_valid(music) and music.playing:
-		music.stop()
+func _play_island_music() -> void:
+	_play_music("res://assets/audio/island_theme.ogg")
+
+
+func _play_battle_music() -> void:
+	# two delivered battle loops — Andy's call: pick one at random per battle
+	_play_music("res://assets/audio/battle_theme_%d.ogg" % (1 + randi() % 2))
 
 
 func _inside(p: Vector2) -> bool:
@@ -535,8 +544,14 @@ func _build_shop() -> void:
 		shop_root.add_child(w)
 
 	# --- wall-mounted (z -2: over the wall, under everyone on the floor) ---
-	# moose trophy centered high on the wall, clear of Grandpa's head
-	var moose := _make_sprite("res://assets/store/moose_head.png", o + Vector2(640, 170), 150.0)
+	# "GRANDPA'S GENERAL STORE" sign takes center stage; window left, moose right
+	var sign := _make_sprite("res://assets/store/sign.png", o + Vector2(640, 185), 185.0)
+	sign.z_index = -2
+	shop_root.add_child(sign)
+	var window := _make_sprite("res://assets/store/window.png", o + Vector2(400, 225), 170.0)
+	window.z_index = -2
+	shop_root.add_child(window)
+	var moose := _make_sprite("res://assets/store/moose_head.png", o + Vector2(870, 170), 150.0)
 	moose.z_index = -2
 	shop_root.add_child(moose)
 	# the lamp art is a lantern — hang one near each end of the wall
@@ -553,11 +568,11 @@ func _build_shop() -> void:
 	mat.z_index = -1
 	shop_root.add_child(mat)
 
-	# --- counter island: Grandpa behind the desk, register side toward him ---
+	# --- counter island: Grandpa behind the desk (counter v2: register faces him) ---
 	shop_root.add_child(_make_sprite("res://assets/store/clerk.png", o + Vector2(640, 355), 220.0))
 	_add_shop_obstacle(o + Vector2(640, 355), Vector2(55, 24))
-	shop_root.add_child(_make_sprite("res://assets/store/counter.png", o + Vector2(640, 445), 240.0))
-	_add_shop_obstacle(o + Vector2(640, 445), Vector2(158, 45))
+	shop_root.add_child(_make_sprite("res://assets/store/counter.png", o + Vector2(640, 445), 210.0))
+	_add_shop_obstacle(o + Vector2(640, 445), Vector2(205, 42))
 
 	# --- furniture against the back wall (bases just under the wall band) ---
 	shop_root.add_child(_make_sprite("res://assets/store/card_display.png", o + Vector2(240, 350), 260.0))
@@ -641,7 +656,7 @@ func _reset_to_select() -> void:
 # ---------------------------------------------------------------- battle
 func _start_battle() -> void:
 	state = "battle"
-	_stop_island_music()
+	_play_battle_music()
 	await _flash_to_white()
 	var b := BATTLE.instantiate()
 	b.enemy_sign = "horse"

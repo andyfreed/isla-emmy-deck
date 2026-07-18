@@ -233,6 +233,7 @@ func _lock_rhythm() -> void:
 	var q := "Miss"
 	if d < 0.10:
 		mult = 1.5; q = "PERFECT!"
+		Globals.play_sfx("perfect")
 	elif d < 0.25:
 		mult = 1.15; q = "Good!"
 	elif d < 0.45:
@@ -268,6 +269,7 @@ func _resolve_move(c: Dictionary, move: Dictionary, mult: float, q: String) -> v
 		enemy["hp"] = max(0, int(enemy["hp"]) - dmg)
 		total += dmg
 		_update_bar(enemy)
+		Globals.play_sfx("hit")
 		_flash_white(enemy["spr"])
 		_scale_punch(enemy["spr"])
 		_popup_dmg(enemy["spr"].position, str(dmg), Color(1, 0.85, 0.2) if big else Color(1, 1, 1), big)
@@ -303,6 +305,7 @@ func _enemy_turn() -> void:
 	var dmg := 7 + (randi() % 7)
 	t["hp"] = max(0, int(t["hp"]) - dmg)
 	_update_bar(t)
+	Globals.play_sfx("hit")
 	_flash_white(t["spr"])
 	_scale_punch(t["spr"])
 	_popup_dmg(t["spr"].position, str(dmg), Color(1, 0.5, 0.5), false)
