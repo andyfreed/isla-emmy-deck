@@ -24,6 +24,7 @@ copy "$SRC/home_island/FINAL"  "$REPO/assets/home_island"
 copy "$SRC/enemies/FINAL"      "$REPO/assets/enemies"     # Moon-zodiac creatures
 copy "$SRC/ui/FINAL"           "$REPO/assets/ui"          # battle/UI pieces
 copy "$SRC/store/FINAL"        "$REPO/assets/store"       # store interior (walk-in shop)
+copy "$SRC/sky/FINAL"          "$REPO/assets/sky"         # island-edge sky + balloon ride
 copy "$SRC/steam/FINAL"        "$REPO/steam"              # store art (not in-world)
 copy "$SRC/audio/FINAL"        "$REPO/assets/audio" ogg   # music + SFX (.ogg only, .wav = master)
 echo "done — review with: git status"

@@ -104,10 +104,12 @@ func _ready() -> void:
 		{"name": "Snack Share", "sign": "monkey", "power": 16 + hb, "hits": 1, "kind": "heal"},
 	]
 	sisters = [isla, emmy]
-	_make_bar(isla, Vector2(60, 662), 280)
-	_make_bar(emmy, Vector2(60, 724), 280)
-	ui.add_child(_label("ISLA", 22, Vector2(348, 656), false))
-	ui.add_child(_label("EMMY", 22, Vector2(348, 718), false))
+	# status bars live bottom-RIGHT under the sisters — the card hand owns the
+	# bottom-left, so HP stays readable while choosing a card
+	_make_bar(isla, Vector2(880, 662), 280)
+	_make_bar(emmy, Vector2(880, 724), 280)
+	ui.add_child(_label("ISLA", 22, Vector2(806, 656), false))
+	ui.add_child(_label("EMMY", 22, Vector2(800, 718), false))
 
 	order = [isla, emmy, enemy]
 
@@ -384,7 +386,7 @@ func _refresh_menu() -> void:
 	var ch := 280.0     # real card art is 600x840 (1:1.4)
 	var gap := 22.0
 	var x0 := 64.0
-	var ink := Color(0.32, 0.19, 0.10)   # dark ink on parchment
+	var ink := Color(0.14, 0.20, 0.35)   # dark ink on the light-blue card (v2 recolor)
 	for i in moves.size():
 		var m: Dictionary = moves[i]
 		var on := i == move_cursor
@@ -404,28 +406,33 @@ func _refresh_menu() -> void:
 			tw.tween_property(card, "position:y", final_y, 0.28) \
 				.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
-		var nm := Label.new()   # sits in the banner
+		var nm := Label.new()   # card v2 flat banner, inner ≈ y75-160 / x100-500 @600px
 		nm.text = str(m["name"])
-		nm.add_theme_font_size_override("font_size", 22)
+		var fs := 22
+		var fnt := nm.get_theme_font("font")
+		while fs > 12 and fnt.get_string_size(nm.text, HORIZONTAL_ALIGNMENT_CENTER, -1.0, fs).x > 128.0:
+			fs -= 1   # backstop: shrink a too-long title into the banner
+		nm.add_theme_font_size_override("font_size", fs)
 		nm.add_theme_color_override("font_color", ink)
-		nm.position = Vector2(0, 30)
+		nm.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		nm.position = Vector2(0, 24)
 		nm.size = Vector2(cw, 30)
 		nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		card.add_child(nm)
 
-		var art := Label.new()  # art window (real illustrations later)
+		var art := Label.new()  # art window ≈ y210-675 @600px (real illustrations later)
 		art.text = SIGN_EMOJI.get(m["sign"], "✨")
 		art.add_theme_font_size_override("font_size", 78)
-		art.position = Vector2(0, 92)
-		art.size = Vector2(cw, 100)
+		art.position = Vector2(0, 95)
+		art.size = Vector2(cw, 105)
 		art.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		card.add_child(art)
 
 		var sign_l := Label.new()
 		sign_l.text = str(m["sign"]).to_upper()
 		sign_l.add_theme_font_size_override("font_size", 15)
-		sign_l.add_theme_color_override("font_color", Color(0.5, 0.35, 0.2))
-		sign_l.position = Vector2(0, 186)
+		sign_l.add_theme_color_override("font_color", Color(0.30, 0.38, 0.52))
+		sign_l.position = Vector2(0, 196)
 		sign_l.size = Vector2(cw, 22)
 		sign_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		card.add_child(sign_l)
@@ -440,7 +447,7 @@ func _refresh_menu() -> void:
 			info.text = "power %d" % int(m["power"])
 		info.add_theme_font_size_override("font_size", 19)
 		info.add_theme_color_override("font_color", ink)
-		info.position = Vector2(0, 229)
+		info.position = Vector2(0, 236)   # card v2 bottom strip ≈ y712-785 @600px
 		info.size = Vector2(cw, 26)
 		info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		card.add_child(info)

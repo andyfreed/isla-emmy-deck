@@ -37,12 +37,25 @@ var in_shop: bool = false
 var shop_obstacles: Array[Dictionary] = []
 var transitioning: bool = false
 
+# balloon ride — fixed parallax screen far south of the shop room; a scenic
+# flight that counts as leaving the island, so presents restock on landing.
+const RIDE_RECT := Rect2(4400, 3200, 1280, 800)
+const RIDE_SECONDS := 13.0
+var ride_root: Node2D
+var riding: bool = false
+var ride_t: float = 0.0
+var ride_id: int = 0
+var ride_layers: Array[Sprite2D] = []   # scrolling region layers (meta px_s = region px/sec)
+var ride_puffs: Array[Sprite2D] = []    # drifting cloud sprites (meta speed = screen px/sec)
+var ride_balloon: Sprite2D
+
 # hud
 var hud: CanvasLayer
 var prompt_label: Label
 var popup_label: Label
 var popup_t: float = 0.0
-var score_label: Label
+var presents_label: Label
+var gold_label: Label
 var present_nodes: Array[Sprite2D] = []
 var chest_nodes: Array[Sprite2D] = []
 
@@ -67,25 +80,38 @@ var menu_items: Array[String] = []
 
 func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
-	if OS.is_debug_build() and args.has("--shop"):
-		_debug_jump_shop(args)
+	if OS.is_debug_build() and (args.has("--shop") or args.has("--village")
+			or args.has("--ride") or args.has("--battle")):
+		_debug_jump(args)
 		return
 	show_select()
 
 
 ## Layout iteration aid (debug builds only, inert in releases):
-##   godot --path . -- --shop [--shot=/abs/out.png]
-## boots straight into the store interior, optionally saves a screenshot + quits.
-func _debug_jump_shop(args: PackedStringArray) -> void:
+##   godot --path . -- --shop|--village|--ride|--battle [--pos=x,y] [--shot=/abs/out.png]
+## boots straight into a scene, optionally saves a screenshot + quits.
+func _debug_jump(args: PackedStringArray) -> void:
 	Globals.hero = "isla"
 	pending_hero = "isla"
 	ui = CanvasLayer.new()   # _enter_village expects one to free
 	add_child(ui)
 	_enter_village("isla")
-	await _enter_shop()
+	for a in args:
+		if a.begins_with("--pos="):
+			var xy := a.trim_prefix("--pos=").split(",")
+			player.position = Vector2(xy[0].to_float(), xy[1].to_float())
+			camera.reset_smoothing()
+	var shot_delay := 1.2
+	if args.has("--shop"):
+		await _enter_shop()
+	elif args.has("--ride"):
+		_start_balloon_ride()   # runs its own flashes; the shot lands mid-flight
+	elif args.has("--battle"):
+		_start_battle()
+		shot_delay = 2.4   # past the intro pause so the cards are dealt
 	for a in args:
 		if a.begins_with("--shot="):
-			await get_tree().create_timer(0.6).timeout
+			await get_tree().create_timer(shot_delay).timeout
 			get_viewport().get_texture().get_image().save_png(a.trim_prefix("--shot="))
 			get_tree().quit()
 
@@ -219,6 +245,11 @@ func _enter_village(hero: String) -> void:
 	transitioning = false
 	shop_root = null
 	shop_obstacles.clear()
+	riding = false
+	ride_id += 1   # invalidates any balloon ride still waiting on its timer
+	ride_root = null
+	ride_layers.clear()
+	ride_puffs.clear()
 
 	_build_island_poly()
 
@@ -227,11 +258,25 @@ func _enter_village(hero: String) -> void:
 	add_child(world)
 
 	var sky := ColorRect.new()
-	sky.color = Color(0.56, 0.8, 0.95)
+	sky.color = Color(0.72, 0.82, 0.93)   # fallback tone matched to the sky art
 	sky.position = Vector2(-3000, -3000)
 	sky.size = WORLD + Vector2(6000, 6000)
 	sky.z_index = -100
 	world.add_child(sky)
+
+	# the endless sky past the island's rim (distant floating islands baked in) —
+	# tiles horizontally, stretched to cover every camera position around the map
+	var skyart := Sprite2D.new()
+	skyart.texture = load("res://assets/sky/edge_sky.png")
+	skyart.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+	skyart.region_enabled = true
+	skyart.centered = false
+	var sky_sc := 3.0
+	skyart.scale = Vector2(sky_sc, sky_sc)
+	skyart.position = Vector2(-700, -350)
+	skyart.region_rect = Rect2(0, 0, (WORLD.x + 2200.0) / sky_sc, 896)
+	skyart.z_index = -99
+	world.add_child(skyart)
 
 	var ground := Polygon2D.new()
 	ground.polygon = island_poly
@@ -250,6 +295,28 @@ func _enter_village(hero: String) -> void:
 	edge.joint_mode = Line2D.LINE_JOINT_ROUND
 	edge.z_index = -9
 	world.add_child(edge)
+
+	# rocky underside along the south-facing rim — with real sky behind the
+	# island now, these make it read as floating (grass lip tucks under the rim)
+	var np := island_poly.size()
+	for i in np:
+		var a := island_poly[i]
+		var b := island_poly[(i + 1) % np]
+		var d := b - a
+		var outward := Vector2(d.y, -d.x).normalized()
+		if outward.y < 0.6:
+			continue
+		var cliff := Sprite2D.new()
+		cliff.texture = load("res://assets/home_island/cliff_edge.png")
+		cliff.centered = false
+		cliff.region_enabled = true   # alternate the art's two rock chunks per edge
+		cliff.region_rect = Rect2(0.0 if i % 2 == 0 else 536.0, 0, 1000, 640)
+		cliff.offset = Vector2(0, -230)   # texture row 230 (top of rock) rides the rim line
+		cliff.position = a - d.normalized() * 20.0
+		cliff.rotation = d.angle()
+		cliff.scale = Vector2((d.length() + 40.0) / 1000.0, 0.42)
+		cliff.z_index = -11
+		world.add_child(cliff)
 
 	obstacles.clear()
 	for tp in [Vector2(950, 720), Vector2(2750, 680), Vector2(1300, 1230),
@@ -306,8 +373,21 @@ func _enter_village(hero: String) -> void:
 	hud = CanvasLayer.new()
 	add_child(hud)
 	hud.add_child(_label("Home Village   (B = title,  ☰ = menu)", 22, Vector2(24, 18), false))
-	score_label = _label("", 30, Vector2(1010, 18), false)
-	hud.add_child(score_label)
+	var counts := HBoxContainer.new()
+	counts.position = Vector2(1000, 14)
+	counts.add_theme_constant_override("separation", 8)
+	hud.add_child(counts)
+	counts.add_child(_hud_icon("res://assets/present.png"))
+	presents_label = _label("0", 30, Vector2.ZERO, false)
+	presents_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	counts.add_child(presents_label)
+	var gap := Control.new()
+	gap.custom_minimum_size = Vector2(24, 0)
+	counts.add_child(gap)
+	counts.add_child(_hud_icon("res://assets/ui/coin.png"))   # the real gold coin (art drop)
+	gold_label = _label("0", 30, Vector2.ZERO, false)
+	gold_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	counts.add_child(gold_label)
 	_update_hud_counts()
 	prompt_label = _label("", 30, Vector2(0, 700), true)
 	prompt_label.add_theme_color_override("font_color", Color(1, 1, 1))
@@ -359,6 +439,27 @@ func _process(delta: float) -> void:
 		popup_t -= delta
 		if popup_t <= 0.0:
 			popup_label.text = ""
+
+	if riding:   # scroll the parallax sky + bob the balloon (runs under the flight timer)
+		ride_t += delta
+		for layer in ride_layers:
+			if not is_instance_valid(layer):
+				continue
+			var r := layer.region_rect
+			r.position.x = fposmod(r.position.x + float(layer.get_meta("px_s")) * delta,
+					float(layer.texture.get_width()))
+			layer.region_rect = r
+		for puff in ride_puffs:
+			if not is_instance_valid(puff):
+				continue
+			puff.position.x -= float(puff.get_meta("speed")) * delta
+			var halfw: float = puff.region_rect.size.x * puff.scale.x * 0.5
+			if puff.position.x < RIDE_RECT.position.x - halfw:
+				puff.position.x = RIDE_RECT.end.x + halfw
+		if is_instance_valid(ride_balloon):
+			ride_balloon.position = RIDE_RECT.get_center() + Vector2(
+					-80.0 + sin(ride_t * 0.45) * 45.0, -20.0 + sin(ride_t * 1.5) * 15.0)
+			ride_balloon.rotation = 0.05 + sin(ride_t * 0.8) * 0.035
 
 	if transitioning:
 		return
@@ -412,9 +513,9 @@ func _process(delta: float) -> void:
 			tw.tween_property(ch, "scale", base * 1.22, 0.10).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 			tw.tween_property(ch, "scale", base, 0.14)
 			for i in 5:
-				var coin := Label.new()
-				coin.text = "🪙"
-				coin.add_theme_font_size_override("font_size", 30)
+				var coin := Sprite2D.new()
+				coin.texture = load("res://assets/ui/coin.png")   # the real gold coin
+				_fit_height(coin, 42.0)
 				coin.position = ch.position + Vector2(randf_range(-30, 30), -60)
 				coin.z_index = 50
 				world.add_child(coin)
@@ -510,7 +611,8 @@ func _interact() -> void:
 			Globals.play_sfx("ui")
 			_popup("Zodiac cards coming soon — Grandpa's still stocking the display! 🌙")
 		"balloon":
-			_popup("The balloon isn't fueled up yet — adventure soon! 🎈")
+			Globals.play_sfx("ui")
+			_start_balloon_ride()
 
 
 # ---------------------------------------------------------------- store interior
@@ -632,6 +734,125 @@ func _exit_shop() -> void:
 	transitioning = false
 
 
+# ---------------------------------------------------------------- balloon ride
+## Fixed-screen scenic flight from the sky kit: scrolling balloon_sky backdrop,
+## two parallax cloud bands cut from clouds.png, and the side-view balloon
+## (Isla & Emmy waving from the basket) bobbing between them. Layering per the
+## art notes, back to front: sky -> far clouds (slow) -> balloon -> near (fast).
+func _build_ride() -> void:
+	ride_root = Node2D.new()
+	ride_root.z_index = 20   # its own stage, above the village layers
+	world.add_child(ride_root)
+	ride_layers.clear()
+	var o := RIDE_RECT.position
+
+	_scroll_layer("res://assets/sky/balloon_sky.png", o, RIDE_RECT.size.y / 896.0,
+			0.0, 896.0, 28.0)
+	# individual puffs cut from the clouds sheet — it isn't a seamless tile
+	# (edge clouds run off the canvas), so tiling it would show cut lines.
+	# Each puff drifts left and wraps back to the right on its own.
+	var puff_rects: Array[Rect2] = [Rect2(30, 90, 440, 220), Rect2(680, 130, 290, 170),
+			Rect2(300, 330, 330, 180), Rect2(70, 540, 260, 150)]
+	for j in 3:   # far layer, behind the balloon: small, slow, faded
+		_cloud_puff(puff_rects[j], o + Vector2(230.0 + j * 420.0 + randf_range(-60, 60),
+				120.0 + (j % 2) * 170.0), 0.5, randf_range(52.0, 68.0), 0.85)
+	ride_balloon = Sprite2D.new()   # centered pivot so the bob + tilt feel natural
+	ride_balloon.texture = load("res://assets/sky/balloon.png")
+	var bsc := 520.0 / 1152.0
+	ride_balloon.scale = Vector2(bsc, bsc)
+	ride_balloon.position = RIDE_RECT.get_center() + Vector2(-80, -20)
+	ride_root.add_child(ride_balloon)
+	for j in 3:   # near layer, in front: big, fast, low
+		_cloud_puff(puff_rects[(j + 1) % 4], o + Vector2(160.0 + j * 470.0 + randf_range(-60, 60),
+				560.0 + (j % 2) * 130.0), 1.05, randf_range(135.0, 165.0), 0.95)
+
+
+## Horizontally-repeating scroll layer clipped to the ride screen. band_y/band_h
+## pick which horizontal slice of the texture shows; speed is in screen px/sec.
+func _scroll_layer(path: String, pos: Vector2, sc: float, band_y: float,
+		band_h: float, speed_px_s: float) -> Sprite2D:
+	var s := Sprite2D.new()
+	s.texture = load(path)
+	s.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+	s.region_enabled = true
+	s.centered = false
+	s.scale = Vector2(sc, sc)
+	s.position = pos
+	s.region_rect = Rect2(0, band_y, RIDE_RECT.size.x / sc + 4.0, band_h)
+	s.set_meta("px_s", speed_px_s / sc)   # stored in region px/sec
+	ride_root.add_child(s)
+	ride_layers.append(s)
+	return s
+
+
+func _cloud_puff(src: Rect2, pos: Vector2, sc: float, speed: float, alpha: float) -> void:
+	var s := Sprite2D.new()
+	s.texture = load("res://assets/sky/clouds.png")
+	s.region_enabled = true
+	s.region_rect = src
+	s.scale = Vector2(sc, sc)
+	s.position = pos
+	s.modulate = Color(1, 1, 1, alpha)
+	s.flip_h = randi() % 2 == 0
+	s.set_meta("speed", speed)
+	ride_root.add_child(s)
+	ride_puffs.append(s)
+
+
+func _start_balloon_ride() -> void:
+	transitioning = true
+	ride_id += 1
+	var my_ride := ride_id
+	await _flash_to_white()
+	if not is_instance_valid(ride_root):
+		_build_ride()
+	ride_root.visible = true
+	riding = true
+	ride_t = 0.0
+	(player.get_node("spr") as Sprite2D).visible = false   # the girls wave from the basket
+	player.position = RIDE_RECT.get_center()               # camera anchor into the ride screen
+	camera.limit_left = int(RIDE_RECT.position.x)
+	camera.limit_top = int(RIDE_RECT.position.y)
+	camera.limit_right = int(RIDE_RECT.end.x)
+	camera.limit_bottom = int(RIDE_RECT.end.y)
+	camera.reset_smoothing()
+	_popup("Up, up and awaaay! 🎈")
+	await _flash_from_white()
+	await get_tree().create_timer(RIDE_SECONDS).timeout
+	if my_ride != ride_id or not is_instance_valid(ride_root) or not is_instance_valid(player):
+		return   # world was torn down (B = title) while we were in the air
+	await _flash_to_white()
+	riding = false
+	ride_root.visible = false
+	(player.get_node("spr") as Sprite2D).visible = true
+	player.position = balloon_pos + Vector2(0, 105)
+	camera.limit_left = -10000000
+	camera.limit_top = -10000000
+	camera.limit_right = 10000000
+	camera.limit_bottom = 10000000
+	camera.reset_smoothing()
+	_respawn_presents()
+	_popup("Home again! Fresh presents all over the island 🎁")
+	await _flash_from_white()
+	transitioning = false
+
+
+## Leaving the island (a balloon ride) restocks the presents — the "respawn
+## only when you revisit" rule the family agreed on.
+func _respawn_presents() -> void:
+	for p in present_nodes:
+		p.visible = true
+
+
+func _hud_icon(path: String) -> TextureRect:
+	var t := TextureRect.new()
+	t.texture = load(path)
+	t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	t.custom_minimum_size = Vector2(40, 40)
+	return t
+
+
 func _popup(text: String) -> void:
 	if popup_label:
 		popup_label.text = text
@@ -639,8 +860,10 @@ func _popup(text: String) -> void:
 
 
 func _update_hud_counts() -> void:
-	if is_instance_valid(score_label):
-		score_label.text = "🎁 %d    🪙 %d" % [Globals.presents, Globals.gold]
+	if is_instance_valid(presents_label):
+		presents_label.text = str(Globals.presents)
+	if is_instance_valid(gold_label):
+		gold_label.text = str(Globals.gold)
 
 
 func _reset_to_select() -> void:
@@ -774,7 +997,7 @@ func _build_menu_items() -> void:
 		]
 	else:
 		menu_items = ["Resume"]
-		if state == "play":
+		if state == "play" and not transitioning:   # not mid-flash or up in the balloon
 			menu_items.append("Test Battle")
 		menu_items.append("Settings")
 		menu_items.append("Quit Game")
