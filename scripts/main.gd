@@ -9,6 +9,8 @@ const SCREEN := Vector2(1280, 800)
 const WORLD := Vector2(3600, 2000)
 const BATTLE := preload("res://battle.tscn")
 const SPEED := 340.0
+const MOUNT_SPEED_MULT := 1.65   # This Guy's land-speed boost — tune freely as islands grow
+const MOUNT_COST := 25           # gold, one-time; the adoption persists across sessions
 const STORY_TEXT := "Long ago, the 12 lucky Zodiac animals lived happily on the Moon.\n\nBut someone did something... and they all tumbled down onto the Funky Islands!\n\nFar from the Moon, they lost their good luck — and grumpy, they started causing trouble in the village.\n\nOnly Isla & Emmy can calm them with a funky dance-off and send each one back home to the Moon.\n\nCalm all 12 and bring back the good luck!"
 
 var state: String = "select"        # select / intro / play / battle
@@ -28,6 +30,14 @@ var spawn_pos := Vector2(1750, 1500)
 var store_pos := Vector2(2560, 980)
 var balloon_pos := Vector2(1820, 470)
 var interact_target: String = ""
+
+# villagers + mount (real-people cast from the art side)
+var grandma_pos := Vector2(1620, 1210)      # parked here until Andy picks her spot
+var grandma_line_i: int = 0
+var grandma_lines: PackedStringArray = []   # loaded from dialogue/grandma.txt
+var llama_park_pos := Vector2(2350, 1120)   # This Guy waits outside Grandpa's store
+var llama_node: Sprite2D                    # parked llama (null while ridden / not adopted)
+var mounted: bool = false
 
 # store interior — one fixed screen-sized room, built lazily far east of the island.
 # Camera limits clamp to the room so it plays as a single non-scrolling screen.
@@ -101,6 +111,9 @@ func _debug_jump(args: PackedStringArray) -> void:
 			var xy := a.trim_prefix("--pos=").split(",")
 			player.position = Vector2(xy[0].to_float(), xy[1].to_float())
 			camera.reset_smoothing()
+	if args.has("--llama"):   # hop straight onto This Guy (doesn't save the unlock)
+		Globals.mount_unlocked = true
+		_mount_llama()
 	var shot_delay := 1.2
 	if args.has("--shop"):
 		await _enter_shop()
@@ -250,6 +263,8 @@ func _enter_village(hero: String) -> void:
 	ride_root = null
 	ride_layers.clear()
 	ride_puffs.clear()
+	mounted = false
+	llama_node = null
 
 	_build_island_poly()
 
@@ -339,6 +354,14 @@ func _enter_village(hero: String) -> void:
 	_add_obstacle(store_pos, Vector2(180, 65))
 	world.add_child(_make_sprite("res://assets/home_island/balloon_station.png", balloon_pos, 520.0))
 	_add_obstacle(balloon_pos, Vector2(150, 60))
+
+	# villagers: Grandma Diane out for a stroll near the well
+	var grandma := _make_sprite("res://assets/npcs/grandma.png", grandma_pos, 275.0)
+	grandma.offset.y += 104.0   # art leaves empty canvas below her feet
+	world.add_child(grandma)
+	_add_obstacle(grandma_pos, Vector2(46, 20))
+	if Globals.mount_unlocked:   # This Guy waits out front of Grandpa's store
+		_spawn_llama(llama_park_pos)
 
 	# presents = currency, scattered around the village
 	present_nodes.clear()
@@ -466,7 +489,7 @@ func _process(delta: float) -> void:
 
 	var dir := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
 	var moving := dir.length() > 0.1
-	var move := dir * SPEED * delta
+	var move := dir * SPEED * (MOUNT_SPEED_MULT if mounted else 1.0) * delta
 	var here := player.position
 	if _can_walk(here + move):
 		player.position = here + move
@@ -484,7 +507,17 @@ func _process(delta: float) -> void:
 	anim_t += delta * (10.0 if moving else 2.5)
 	var s := sin(anim_t)
 	var spr := player.get_node("spr") as Sprite2D
-	if moving:
+	if mounted:
+		# riding: This Guy does the bouncing, the sister sits just behind his
+		# neck. His art faces LEFT (the girls' faces right), so his flip inverts.
+		var m := player.get_node("mount") as Sprite2D
+		if dir.x != 0.0:
+			m.flip_h = dir.x > 0.0
+			spr.flip_h = dir.x < 0.0
+		m.position.y = -absf(s) * (9.0 if moving else 3.0)
+		spr.position = Vector2(15.0 if m.flip_h else -15.0, -200.0 + m.position.y)
+		spr.scale = player_base_scale
+	elif moving:
 		spr.position.y = -absf(s) * 13.0
 		spr.scale = player_base_scale * Vector2(1.0 - 0.05 * s, 1.0 + 0.05 * s)
 		if dir.x != 0.0:
@@ -540,6 +573,13 @@ func _process(delta: float) -> void:
 		interact_target = "store"; ptxt = "Ⓐ  General Store"
 	elif player.position.distance_to(balloon_pos) < 180.0:
 		interact_target = "balloon"; ptxt = "Ⓐ  Launch Balloon"
+	elif player.position.distance_to(grandma_pos) < 140.0:
+		interact_target = "grandma"; ptxt = "Ⓐ  Talk to Grandma Diane"
+	elif not mounted and is_instance_valid(llama_node) \
+			and player.position.distance_to(llama_node.position) < 150.0:
+		interact_target = "this_guy"; ptxt = "Ⓐ  Ride This Guy 🦙"
+	elif mounted:
+		interact_target = "dismount"; ptxt = "Ⓐ  Hop off This Guy"
 	prompt_label.text = ptxt
 
 
@@ -603,6 +643,8 @@ func _interact() -> void:
 		return
 	match interact_target:
 		"store":
+			if mounted:
+				_dismount_llama(true)   # This Guy waits outside
 			_enter_shop()
 		"counter":
 			Globals.play_sfx("ui")
@@ -611,8 +653,16 @@ func _interact() -> void:
 			Globals.play_sfx("ui")
 			_popup("Zodiac cards coming soon — Grandpa's still stocking the display! 🌙")
 		"balloon":
+			if mounted:
+				_dismount_llama(true)   # no flying llamas — the balloon keeps that job
 			Globals.play_sfx("ui")
 			_start_balloon_ride()
+		"grandma":
+			_grandma_talk()
+		"this_guy":
+			_mount_llama()
+		"dismount":
+			_dismount_llama()
 
 
 # ---------------------------------------------------------------- store interior
@@ -844,6 +894,62 @@ func _respawn_presents() -> void:
 		p.visible = true
 
 
+# ---------------------------------------------------------------- villagers + mount
+## Grandma Diane's lines live in dialogue/grandma.txt (one per line, # = comment)
+## so Andy can edit them without touching code. Talking cycles through them.
+func _grandma_talk() -> void:
+	Globals.play_sfx("ui")
+	if grandma_lines.is_empty():
+		for line: String in FileAccess.get_file_as_string("res://dialogue/grandma.txt").split("\n"):
+			var t := line.strip_edges()
+			if t != "" and not t.begins_with("#"):
+				grandma_lines.append(t)
+		if grandma_lines.is_empty():
+			grandma_lines.append("Hello my darlings! 💛")
+	_popup("Grandma Diane:  %s" % grandma_lines[grandma_line_i % grandma_lines.size()])
+	grandma_line_i += 1
+
+
+## This Guy — the girls' pink llama plush as an adoptable mount (bought from
+## Grandpa). Land travel only: he multiplies walking speed; the balloon keeps
+## the between-islands job (his rainbow wing is just for style).
+func _spawn_llama(pos: Vector2) -> void:
+	if not is_instance_valid(world):
+		return
+	llama_node = _make_sprite("res://assets/npcs/this_guy.png", pos, 480.0)
+	llama_node.offset.y += 76.0   # art leaves empty canvas below his hooves
+	world.add_child(llama_node)
+
+
+func _mount_llama() -> void:
+	Globals.play_sfx("gift")
+	mounted = true
+	if is_instance_valid(llama_node):
+		if _can_walk(llama_node.position):
+			player.position = llama_node.position
+		llama_node.queue_free()
+	llama_node = null
+	var m := _make_sprite("res://assets/npcs/this_guy.png", Vector2.ZERO, 480.0)
+	m.offset.y += 76.0
+	m.name = "mount"
+	player.add_child(m)   # drawn OVER the sister: her legs sink into his fluff,
+	_popup("This Guy says: let's gooo! 🦙🌈")   # head + torso peek over his back
+
+
+func _dismount_llama(quiet: bool = false) -> void:
+	mounted = false
+	var m := player.get_node_or_null("mount")
+	if m:
+		m.queue_free()
+	var spr := player.get_node("spr") as Sprite2D
+	spr.position = Vector2.ZERO
+	spr.scale = player_base_scale
+	var spot := player.position + Vector2(-95, -35)
+	_spawn_llama(spot if _can_walk(spot) else player.position)
+	if not quiet:
+		_popup("This Guy waits for you 🦙")
+
+
 func _hud_icon(path: String) -> TextureRect:
 	var t := TextureRect.new()
 	t.texture = load(path)
@@ -987,8 +1093,10 @@ func _build_menu_items() -> void:
 		menu_items = [
 			"Sharpen Star Sword  (+2 atk)  — %d 🪙   [Lv %d]" % [_sword_cost(), Globals.sword_level],
 			"Bigger Snacks  (+4 heal)  — %d 🪙" % _snack_cost(),
-			"Leave     (you have %d 🪙)" % Globals.gold,
 		]
+		if not Globals.mount_unlocked:
+			menu_items.append("Adopt This Guy the llama  (rideable!)  — %d 🪙" % MOUNT_COST)
+		menu_items.append("Leave     (you have %d 🪙)" % Globals.gold)
 	elif menu_mode == "settings":
 		menu_items = [
 			"Game Music     %s" % _slider_bar(Globals.music_volume),
@@ -1051,32 +1159,41 @@ func _menu_select() -> void:
 		return
 
 	if menu_mode == "store":
-		match menu_cursor:
-			0:
-				if Globals.gold >= _sword_cost():
-					Globals.gold -= _sword_cost()
-					Globals.atk_bonus += 2
-					Globals.sword_level += 1
-					Globals.play_sfx("coin")
-					_popup("Star Sword sharpened! ⚔ attack +2")
-				else:
-					_popup("Not enough gold! Calm creatures & find chests 🪙")
-				_build_menu_items()
-				_refresh_menu()
-				_update_hud_counts()
-			1:
-				if Globals.gold >= _snack_cost():
-					Globals.gold -= _snack_cost()
-					Globals.heal_bonus += 4
-					Globals.play_sfx("coin")
-					_popup("Snacks upgraded! 🍪 heal +4")
-				else:
-					_popup("Not enough gold! Calm creatures & find chests 🪙")
-				_build_menu_items()
-				_refresh_menu()
-				_update_hud_counts()
-			2:
-				_close_menu()
+		# rows shift as one-time items sell out, so match on the label
+		var pick := menu_items[menu_cursor]
+		if pick.begins_with("Leave"):
+			_close_menu()
+		elif pick.begins_with("Sharpen"):
+			if Globals.gold >= _sword_cost():
+				Globals.gold -= _sword_cost()
+				Globals.atk_bonus += 2
+				Globals.sword_level += 1
+				Globals.play_sfx("coin")
+				_popup("Star Sword sharpened! ⚔ attack +2")
+			else:
+				_popup("Not enough gold! Calm creatures & find chests 🪙")
+		elif pick.begins_with("Bigger"):
+			if Globals.gold >= _snack_cost():
+				Globals.gold -= _snack_cost()
+				Globals.heal_bonus += 4
+				Globals.play_sfx("coin")
+				_popup("Snacks upgraded! 🍪 heal +4")
+			else:
+				_popup("Not enough gold! Calm creatures & find chests 🪙")
+		elif pick.begins_with("Adopt"):
+			if Globals.gold >= MOUNT_COST:
+				Globals.gold -= MOUNT_COST
+				Globals.unlock_mount()   # saved — he's theirs forever
+				Globals.play_sfx("coin")
+				_spawn_llama(llama_park_pos)
+				_popup("This Guy is yours! He's waiting outside 🦙🌈")
+			else:
+				_popup("Not enough gold! Calm creatures & find chests 🪙")
+		if not pick.begins_with("Leave"):
+			_build_menu_items()
+			menu_cursor = mini(menu_cursor, menu_items.size() - 1)
+			_refresh_menu()
+			_update_hud_counts()
 		return
 
 	var item := menu_items[menu_cursor]

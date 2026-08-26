@@ -1,0 +1,10 @@
+# Grandma Diane's lines — she says the NEXT one each time the girls talk to her.
+# One line of dialogue per line here. Lines starting with # are ignored.
+# Andy: edit this file freely (girls' ideas welcome!) — no code changes needed.
+# Keep each line under ~55 characters so it fits on screen in one row.
+Well hello, my darlings! Come give Grandma a hug! 💛
+*laughs* Isn't this island just the funkiest?
+Have you said hi to Grandpa at his store?
+Flying balloons all by yourselves? My my!
+Found any presents today, sweethearts?
+You two be sweet to those grumpy zodiac critters!

@@ -10,6 +10,7 @@ var presents: int = 0
 var atk_bonus: int = 0      # added to attack-card power
 var heal_bonus: int = 0     # added to heal-card power
 var sword_level: int = 1
+var mount_unlocked: bool = false   # This Guy adopted — persists (unlike gold), so buy once ever
 
 # audio settings (0-10, persisted). Music/SFX buses are created here at runtime
 # so the default bus layout stays untouched; players opt in via .bus = "Music"/"SFX".
@@ -45,6 +46,11 @@ func _ready() -> void:
 	_apply_volumes()
 
 
+func unlock_mount() -> void:
+	mount_unlocked = true
+	_save_settings()
+
+
 func set_music_volume(v: int) -> void:
 	music_volume = clampi(v, 0, 10)
 	_apply_volumes()
@@ -75,10 +81,12 @@ func _load_settings() -> void:
 	if cfg.load(SETTINGS_PATH) == OK:
 		music_volume = clampi(int(cfg.get_value("audio", "music", music_volume)), 0, 10)
 		sfx_volume = clampi(int(cfg.get_value("audio", "sfx", sfx_volume)), 0, 10)
+		mount_unlocked = bool(cfg.get_value("progress", "mount", mount_unlocked))
 
 
 func _save_settings() -> void:
 	var cfg := ConfigFile.new()
 	cfg.set_value("audio", "music", music_volume)
 	cfg.set_value("audio", "sfx", sfx_volume)
+	cfg.set_value("progress", "mount", mount_unlocked)
 	cfg.save(SETTINGS_PATH)
