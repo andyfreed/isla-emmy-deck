@@ -425,9 +425,19 @@ func _refresh_menu() -> void:
 		# art window ≈ x95-505 / y210-675 @600x840 → local /3. Real zodiac
 		# illustrations drop in automatically once delivered; emoji until then.
 		var art_path := "res://assets/cards/card_%s.png" % str(m["sign"])
-		if ResourceLoader.exists(art_path):
+		var has_art := ResourceLoader.exists(art_path)
+		if has_art:
 			var artt := TextureRect.new()
-			artt.texture = load(art_path)
+			var tex := load(art_path) as Texture2D
+			if tex.get_width() >= 410 and tex.get_height() >= 465:
+				# deliveries carry ~25px of bleed past the window — crop it off
+				var at := AtlasTexture.new()
+				at.atlas = tex
+				at.region = Rect2((tex.get_width() - 410.0) * 0.5,
+						(tex.get_height() - 465.0) * 0.5, 410.0, 465.0)
+				artt.texture = at
+			else:
+				artt.texture = tex
 			artt.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 			artt.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 			artt.position = Vector2(32, 70)
@@ -442,14 +452,15 @@ func _refresh_menu() -> void:
 			art.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			card.add_child(art)
 
-		var sign_l := Label.new()
-		sign_l.text = str(m["sign"]).to_upper()
-		sign_l.add_theme_font_size_override("font_size", 15)
-		sign_l.add_theme_color_override("font_color", Color(0.30, 0.38, 0.52))
-		sign_l.position = Vector2(0, 196)
-		sign_l.size = Vector2(cw, 22)
-		sign_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		card.add_child(sign_l)
+		if not has_art:   # real illustrations ARE the animal — label only helps emoji
+			var sign_l := Label.new()
+			sign_l.text = str(m["sign"]).to_upper()
+			sign_l.add_theme_font_size_override("font_size", 15)
+			sign_l.add_theme_color_override("font_color", Color(0.30, 0.38, 0.52))
+			sign_l.position = Vector2(0, 196)
+			sign_l.size = Vector2(cw, 22)
+			sign_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			card.add_child(sign_l)
 
 		var info := Label.new()  # bottom strip
 		var hits := int(m["hits"])
