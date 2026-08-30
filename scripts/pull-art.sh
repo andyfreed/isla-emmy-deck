@@ -26,6 +26,10 @@ copy "$SRC/ui/FINAL"           "$REPO/assets/ui"          # battle/UI pieces
 copy "$SRC/store/FINAL"        "$REPO/assets/store"       # store interior (walk-in shop)
 copy "$SRC/sky/FINAL"          "$REPO/assets/sky"         # island-edge sky + balloon ride
 copy "$SRC/npcs/FINAL"         "$REPO/assets/npcs"        # villagers + mounts (real-people cast)
+# some NPC exports ship semi-transparent garment interiors — bake them solid
+if command -v godot >/dev/null 2>&1; then
+	(cd "$REPO" && godot --headless -s scripts/fix-npc-alpha.gd 2>/dev/null | grep solidified) || true
+fi
 copy "$SRC/cards/FINAL"        "$REPO/assets/cards"       # zodiac card illustrations (card_<sign>.png)
 copy "$SRC/steam/FINAL"        "$REPO/steam"              # store art (not in-world)
 copy "$SRC/audio/FINAL"        "$REPO/assets/audio" ogg   # music + SFX (.ogg only, .wav = master)

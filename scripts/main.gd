@@ -371,7 +371,6 @@ func _enter_village(hero: String) -> void:
 	# villagers: Grandma Diane out for a stroll near the well
 	var grandma := _make_sprite("res://assets/npcs/grandma.png", grandma_pos, 275.0)
 	grandma.offset.y += 104.0   # art leaves empty canvas below her feet
-	grandma.material = _solid_material()   # her art's pants are semi-transparent
 	world.add_child(grandma)
 	_add_obstacle(grandma_pos, Vector2(46, 20))
 	if Globals.mount_unlocked:   # This Guy waits out front of Grandpa's store
@@ -999,18 +998,6 @@ func _end_talk() -> void:
 	if is_instance_valid(talk_bubble):
 		talk_bubble.queue_free()
 	talk_bubble = null
-
-
-## The delivered grandma art paints garment interiors semi-transparent (pants
-## ~40-70% alpha — grass showed through). Lift interior alpha to solid; soft
-## anti-aliased edges below the threshold keep their softness. Harmless no-op
-## once the art side re-exports with opaque interiors.
-func _solid_material() -> ShaderMaterial:
-	var sh := Shader.new()
-	sh.code = "shader_type canvas_item;\nvoid fragment() {\n\tif (COLOR.a > 0.30) {\n\t\tCOLOR.a = min(1.0, COLOR.a * 2.2);\n\t}\n}\n"
-	var mat := ShaderMaterial.new()
-	mat.shader = sh
-	return mat
 
 
 ## This Guy — the girls' pink llama plush as an adoptable mount (bought from
