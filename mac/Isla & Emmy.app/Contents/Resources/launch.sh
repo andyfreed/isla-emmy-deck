@@ -1,0 +1,45 @@
+#!/bin/bash
+# Isla & Emmy: Funky Islands — self-updating macOS launcher.
+# Double-click the app: it grabs the newest build from GitHub (if any), then plays.
+# The friend does nothing but launch. Requires internet for the first run only.
+set -u
+
+REPO="andyfreed/isla-emmy-deck"
+DIR="$HOME/Library/Application Support/IslaEmmy"
+ZIP="$DIR/game.zip"
+URL="https://github.com/$REPO/releases/latest/download/isla-emmy-mac.zip"
+
+mkdir -p "$DIR"
+
+# only download if remote is newer (macOS bash 3.2: no empty-array expansion)
+if [ -f "$ZIP" ]; then
+    curl -fsL --connect-timeout 10 -z "$ZIP" -o "$ZIP.new" "$URL"
+else
+    curl -fsL --connect-timeout 10 -o "$ZIP.new" "$URL"
+fi
+if [ -s "$ZIP.new" ]; then
+    mv "$ZIP.new" "$ZIP"
+    rm -rf "$DIR/app"
+    mkdir -p "$DIR/app"
+    ditto -x -k "$ZIP" "$DIR/app"
+    APP="$(/usr/bin/find "$DIR/app" -maxdepth 2 -name "*.app" -print -quit)"
+    if [ -n "$APP" ]; then
+        xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true
+        # keep a real Developer ID signature intact; ad-hoc sign only as fallback
+        if ! codesign --verify --deep "$APP" 2>/dev/null; then
+            codesign --force --deep -s - "$APP" 2>/dev/null || true
+        fi
+        echo "$APP" > "$DIR/apppath"
+    fi
+else
+    rm -f "$ZIP.new"
+fi
+
+APP="$(cat "$DIR/apppath" 2>/dev/null || true)"
+if [ -z "${APP:-}" ] || [ ! -d "$APP" ]; then
+    osascript -e 'display alert "Isla & Emmy" message "The first launch needs internet to download the game. Connect and open me again!"' >/dev/null 2>&1
+    exit 1
+fi
+
+BIN="$(/usr/bin/find "$APP/Contents/MacOS" -type f -print -quit)"
+exec "$BIN"
