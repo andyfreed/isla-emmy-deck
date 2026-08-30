@@ -26,6 +26,7 @@ copy "$SRC/ui/FINAL"           "$REPO/assets/ui"          # battle/UI pieces
 copy "$SRC/store/FINAL"        "$REPO/assets/store"       # store interior (walk-in shop)
 copy "$SRC/sky/FINAL"          "$REPO/assets/sky"         # island-edge sky + balloon ride
 copy "$SRC/npcs/FINAL"         "$REPO/assets/npcs"        # villagers + mounts (real-people cast)
+copy "$SRC/cards/FINAL"        "$REPO/assets/cards"       # zodiac card illustrations (card_<sign>.png)
 copy "$SRC/steam/FINAL"        "$REPO/steam"              # store art (not in-world)
 copy "$SRC/audio/FINAL"        "$REPO/assets/audio" ogg   # music + SFX (.ogg only, .wav = master)
 echo "done — review with: git status"

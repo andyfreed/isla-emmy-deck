@@ -38,6 +38,9 @@ var grandma_lines: PackedStringArray = []   # loaded from dialogue/grandma.txt
 var llama_park_pos := Vector2(2350, 1120)   # This Guy waits outside Grandpa's store
 var llama_node: Sprite2D                    # parked llama (null while ridden / not adopted)
 var mounted: bool = false
+var talking: bool = false                   # NPC speech bubble open (A = more, B = bye)
+var talk_bubble: Node2D
+var talk_anchor := Vector2.ZERO             # world point the bubble hovers over
 
 # store interior — one fixed screen-sized room, built lazily far east of the island.
 # Camera limits clamp to the room so it plays as a single non-scrolling screen.
@@ -114,9 +117,15 @@ func _debug_jump(args: PackedStringArray) -> void:
 	if args.has("--llama"):   # hop straight onto This Guy (doesn't save the unlock)
 		Globals.mount_unlocked = true
 		_mount_llama()
+	if args.has("--talk"):   # open Grandma's speech bubble for layout shots
+		player.position = grandma_pos + Vector2(20, 135)
+		camera.reset_smoothing()
+		_grandma_talk()
 	var shot_delay := 1.2
 	if args.has("--shop"):
 		await _enter_shop()
+		if args.has("--menu"):
+			_open_menu("store")
 	elif args.has("--ride"):
 		_start_balloon_ride()   # runs its own flashes; the shot lands mid-flight
 	elif args.has("--battle"):
@@ -220,6 +229,8 @@ func _input(event: InputEvent) -> void:
 	elif state == "play":
 		if event is InputEventJoypadButton and (event as InputEventJoypadButton).pressed \
 				and (event as InputEventJoypadButton).button_index == JOY_BUTTON_B:
+			if talking:   # B says bye first; only a second B leaves to the title
+				_end_talk(); return
 			_reset_to_select(); return
 		if _a_pressed(event) or _pointer_pos(event).x >= 0.0:
 			_interact()
@@ -265,6 +276,8 @@ func _enter_village(hero: String) -> void:
 	ride_puffs.clear()
 	mounted = false
 	llama_node = null
+	talking = false
+	talk_bubble = null
 
 	_build_island_poly()
 
@@ -358,6 +371,7 @@ func _enter_village(hero: String) -> void:
 	# villagers: Grandma Diane out for a stroll near the well
 	var grandma := _make_sprite("res://assets/npcs/grandma.png", grandma_pos, 275.0)
 	grandma.offset.y += 104.0   # art leaves empty canvas below her feet
+	grandma.material = _solid_material()   # her art's pants are semi-transparent
 	world.add_child(grandma)
 	_add_obstacle(grandma_pos, Vector2(46, 20))
 	if Globals.mount_unlocked:   # This Guy waits out front of Grandpa's store
@@ -463,6 +477,11 @@ func _process(delta: float) -> void:
 		if popup_t <= 0.0:
 			popup_label.text = ""
 
+	if talking:
+		_position_bubble()   # tracks the smoothed camera every frame
+		if player.position.distance_to(grandma_pos) > 200.0:
+			_end_talk()
+
 	if riding:   # scroll the parallax sky + bob the balloon (runs under the flight timer)
 		ride_t += delta
 		for layer in ride_layers:
@@ -559,7 +578,7 @@ func _process(delta: float) -> void:
 			var loot := 4 + randi() % 4
 			Globals.gold += loot
 			_update_hud_counts()
-			_popup("Treasure!  +%d gold 🪙" % loot)
+			_popup("Treasure!  +%d gold ⭐" % loot)
 
 	# interaction prompt
 	interact_target = ""
@@ -574,7 +593,8 @@ func _process(delta: float) -> void:
 	elif player.position.distance_to(balloon_pos) < 180.0:
 		interact_target = "balloon"; ptxt = "Ⓐ  Launch Balloon"
 	elif player.position.distance_to(grandma_pos) < 140.0:
-		interact_target = "grandma"; ptxt = "Ⓐ  Talk to Grandma Diane"
+		interact_target = "grandma"
+		ptxt = "Ⓐ  more      Ⓑ  bye 👋" if talking else "Ⓐ  Talk to Grandma Diane"
 	elif not mounted and is_instance_valid(llama_node) \
 			and player.position.distance_to(llama_node.position) < 150.0:
 		interact_target = "this_guy"; ptxt = "Ⓐ  Ride This Guy 🦙"
@@ -906,8 +926,91 @@ func _grandma_talk() -> void:
 				grandma_lines.append(t)
 		if grandma_lines.is_empty():
 			grandma_lines.append("Hello my darlings! 💛")
-	_popup("Grandma Diane:  %s" % grandma_lines[grandma_line_i % grandma_lines.size()])
+	talking = true
+	talk_anchor = grandma_pos + Vector2(0, -245)   # just above her head
+	_show_bubble(grandma_lines[grandma_line_i % grandma_lines.size()])
 	grandma_line_i += 1
+
+
+## Comic speech bubble in the HUD, hovering over talk_anchor (world space).
+## Rebuilt per line; _position_bubble keeps it glued to the smoothed camera.
+func _show_bubble(text: String) -> void:
+	if is_instance_valid(talk_bubble):
+		talk_bubble.queue_free()
+	talk_bubble = Node2D.new()
+	var fs := 24
+	var fnt := popup_label.get_theme_font("font")
+	var ms := fnt.get_multiline_string_size(text, HORIZONTAL_ALIGNMENT_CENTER, 430.0, fs)
+	var w := minf(ms.x, 430.0) + 36.0
+	var h := ms.y + 20.0
+	var panel := Panel.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(1.0, 0.99, 0.94)
+	style.border_color = Color(0.25, 0.20, 0.30)
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(14)
+	panel.add_theme_stylebox_override("panel", style)
+	panel.position = Vector2(-w * 0.5, -h - 16.0)
+	panel.size = Vector2(w, h)
+	talk_bubble.add_child(panel)
+	var tail := Polygon2D.new()   # border wedge with the fill wedge on top;
+	tail.color = style.border_color   # _position_bubble aims both at the speaker
+	talk_bubble.add_child(tail)
+	talk_bubble.set_meta("tail", tail)
+	var tail_fill := Polygon2D.new()
+	tail_fill.color = style.bg_color
+	talk_bubble.add_child(tail_fill)
+	talk_bubble.set_meta("tail_fill", tail_fill)
+	var l := Label.new()
+	l.text = text
+	l.add_theme_font_size_override("font_size", fs)
+	l.add_theme_color_override("font_color", Color(0.16, 0.13, 0.22))
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	l.position = panel.position + Vector2(18, 6)
+	l.size = Vector2(w - 36.0, h - 12.0)
+	talk_bubble.add_child(l)
+	talk_bubble.set_meta("h", h + 22.0)
+	hud.add_child(talk_bubble)
+	_position_bubble()
+
+
+func _position_bubble() -> void:
+	if not is_instance_valid(talk_bubble):
+		return
+	var a: Vector2 = get_viewport().get_canvas_transform() * talk_anchor
+	var p := a
+	p.x = clampf(p.x, 250.0, SCREEN.x - 250.0)   # whole bubble stays on screen
+	p.y = clampf(p.y, float(talk_bubble.get_meta("h")) + 24.0, SCREEN.y - 30.0)
+	if p.y - a.y > 40.0:   # clamp would park it on the speaker's face — slide aside
+		p.x = clampf(a.x + 265.0, 250.0, SCREEN.x - 250.0)
+	talk_bubble.position = p
+	var tip := (a - p).limit_length(120.0)   # tail keeps pointing at the speaker
+	tip.y = maxf(tip.y, 2.0)
+	(talk_bubble.get_meta("tail") as Polygon2D).polygon = PackedVector2Array(
+			[Vector2(-13, -19), Vector2(13, -19), tip])
+	(talk_bubble.get_meta("tail_fill") as Polygon2D).polygon = PackedVector2Array(
+			[Vector2(-8, -20), Vector2(8, -20), tip * 0.8 - Vector2(0, 4)])
+
+
+func _end_talk() -> void:
+	talking = false
+	if is_instance_valid(talk_bubble):
+		talk_bubble.queue_free()
+	talk_bubble = null
+
+
+## The delivered grandma art paints garment interiors semi-transparent (pants
+## ~40-70% alpha — grass showed through). Lift interior alpha to solid; soft
+## anti-aliased edges below the threshold keep their softness. Harmless no-op
+## once the art side re-exports with opaque interiors.
+func _solid_material() -> ShaderMaterial:
+	var sh := Shader.new()
+	sh.code = "shader_type canvas_item;\nvoid fragment() {\n\tif (COLOR.a > 0.30) {\n\t\tCOLOR.a = min(1.0, COLOR.a * 2.2);\n\t}\n}\n"
+	var mat := ShaderMaterial.new()
+	mat.shader = sh
+	return mat
 
 
 ## This Guy — the girls' pink llama plush as an adoptable mount (bought from
@@ -984,6 +1087,7 @@ func _reset_to_select() -> void:
 
 # ---------------------------------------------------------------- battle
 func _start_battle() -> void:
+	_end_talk()
 	state = "battle"
 	_play_battle_music()
 	await _flash_to_white()
@@ -1054,6 +1158,9 @@ func _open_menu(mode: String = "pause") -> void:
 	menu_open = true
 	menu_mode = mode
 	menu_cursor = 0
+	if popup_label:   # a lingering popup would bleed through the menu dim
+		popup_label.text = ""
+		popup_t = 0.0
 	_build_menu_items()
 
 	menu_layer = CanvasLayer.new()
@@ -1091,12 +1198,12 @@ func _snack_cost() -> int:
 func _build_menu_items() -> void:
 	if menu_mode == "store":
 		menu_items = [
-			"Sharpen Star Sword  (+2 atk)  — %d 🪙   [Lv %d]" % [_sword_cost(), Globals.sword_level],
-			"Bigger Snacks  (+4 heal)  — %d 🪙" % _snack_cost(),
+			"Sharpen Star Sword  (+2 atk)  — %d ⭐   [Lv %d]" % [_sword_cost(), Globals.sword_level],
+			"Extra Frosting  (+4 heal)  — %d ⭐" % _snack_cost(),
 		]
 		if not Globals.mount_unlocked:
-			menu_items.append("Adopt This Guy the llama  (rideable!)  — %d 🪙" % MOUNT_COST)
-		menu_items.append("Leave     (you have %d 🪙)" % Globals.gold)
+			menu_items.append("Adopt This Guy the llama  (rideable!)  — %d ⭐" % MOUNT_COST)
+		menu_items.append("Leave     (you have %d ⭐)" % Globals.gold)
 	elif menu_mode == "settings":
 		menu_items = [
 			"Game Music     %s" % _slider_bar(Globals.music_volume),
@@ -1171,15 +1278,15 @@ func _menu_select() -> void:
 				Globals.play_sfx("coin")
 				_popup("Star Sword sharpened! ⚔ attack +2")
 			else:
-				_popup("Not enough gold! Calm creatures & find chests 🪙")
-		elif pick.begins_with("Bigger"):
+				_popup("Not enough gold! Calm creatures & find chests ⭐")
+		elif pick.begins_with("Extra"):
 			if Globals.gold >= _snack_cost():
 				Globals.gold -= _snack_cost()
 				Globals.heal_bonus += 4
 				Globals.play_sfx("coin")
-				_popup("Snacks upgraded! 🍪 heal +4")
+				_popup("Extra frosting! 🍩 donuts & cinnamon rolls heal +4")
 			else:
-				_popup("Not enough gold! Calm creatures & find chests 🪙")
+				_popup("Not enough gold! Calm creatures & find chests ⭐")
 		elif pick.begins_with("Adopt"):
 			if Globals.gold >= MOUNT_COST:
 				Globals.gold -= MOUNT_COST
@@ -1188,7 +1295,7 @@ func _menu_select() -> void:
 				_spawn_llama(llama_park_pos)
 				_popup("This Guy is yours! He's waiting outside 🦙🌈")
 			else:
-				_popup("Not enough gold! Calm creatures & find chests 🪙")
+				_popup("Not enough gold! Calm creatures & find chests ⭐")
 		if not pick.begins_with("Leave"):
 			_build_menu_items()
 			menu_cursor = mini(menu_cursor, menu_items.size() - 1)

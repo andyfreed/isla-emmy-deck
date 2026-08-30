@@ -94,14 +94,14 @@ func _ready() -> void:
 	isla["moves"] = [
 		{"name": "Star Slash", "sign": "rat", "power": 11 + ab, "hits": 1, "kind": "attack"},
 		{"name": "Nibble Flurry", "sign": "rat", "power": 5 + ab, "hits": 3, "kind": "attack"},
-		{"name": "Snack Share", "sign": "rat", "power": 16 + hb, "hits": 1, "kind": "heal"},
+		{"name": "Donut Party", "sign": "rat", "power": 16 + hb, "hits": 1, "kind": "heal"},
 	]
 	var emmy := _make_combatant("Emmy", "monkey", 52, true,
 		"res://assets/emmy.png", Vector2(1115, 500), 180.0, true)
 	emmy["moves"] = [
 		{"name": "Star Slash", "sign": "monkey", "power": 11 + ab, "hits": 1, "kind": "attack"},
 		{"name": "Silly Dance", "sign": "monkey", "power": 9 + ab, "hits": 1, "kind": "attack"},
-		{"name": "Snack Share", "sign": "monkey", "power": 16 + hb, "hits": 1, "kind": "heal"},
+		{"name": "Cinnamon Roll", "sign": "monkey", "power": 16 + hb, "hits": 1, "kind": "heal"},
 	]
 	sisters = [isla, emmy]
 	# status bars live bottom-RIGHT under the sisters — the card hand owns the
@@ -336,7 +336,7 @@ func _finish(win: bool) -> void:
 		var reward := 6 + randi() % 5
 		Globals.gold += reward
 		Globals.play_sfx("coin")
-		msg.text = "Calmed and home to the Moon!  +%d gold 🪙" % reward
+		msg.text = "Calmed and home to the Moon!  +%d gold ⭐" % reward
 		await get_tree().create_timer(1.0).timeout
 	else:
 		msg.add_theme_color_override("font_color", Color(1, 0.7, 0.7))
@@ -415,18 +415,32 @@ func _refresh_menu() -> void:
 		nm.add_theme_font_size_override("font_size", fs)
 		nm.add_theme_color_override("font_color", ink)
 		nm.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		nm.position = Vector2(0, 24)
+		# Baloo 2 reserves a tall ascent, so centered glyphs sit optically low —
+		# both text boxes ride a few px above their painted rects on purpose
+		nm.position = Vector2(0, 19)
 		nm.size = Vector2(cw, 30)
 		nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		card.add_child(nm)
 
-		var art := Label.new()  # art window ≈ y210-675 @600px (real illustrations later)
-		art.text = SIGN_EMOJI.get(m["sign"], "✨")
-		art.add_theme_font_size_override("font_size", 78)
-		art.position = Vector2(0, 95)
-		art.size = Vector2(cw, 105)
-		art.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		card.add_child(art)
+		# art window ≈ x95-505 / y210-675 @600x840 → local /3. Real zodiac
+		# illustrations drop in automatically once delivered; emoji until then.
+		var art_path := "res://assets/cards/card_%s.png" % str(m["sign"])
+		if ResourceLoader.exists(art_path):
+			var artt := TextureRect.new()
+			artt.texture = load(art_path)
+			artt.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			artt.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			artt.position = Vector2(32, 70)
+			artt.size = Vector2(136, 155)
+			card.add_child(artt)
+		else:
+			var art := Label.new()
+			art.text = SIGN_EMOJI.get(m["sign"], "✨")
+			art.add_theme_font_size_override("font_size", 78)
+			art.position = Vector2(0, 95)
+			art.size = Vector2(cw, 105)
+			art.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			card.add_child(art)
 
 		var sign_l := Label.new()
 		sign_l.text = str(m["sign"]).to_upper()
@@ -447,9 +461,11 @@ func _refresh_menu() -> void:
 			info.text = "power %d" % int(m["power"])
 		info.add_theme_font_size_override("font_size", 19)
 		info.add_theme_color_override("font_color", ink)
-		info.position = Vector2(0, 236)   # card v2 bottom strip ≈ y712-785 @600px
-		info.size = Vector2(cw, 26)
+		# strip inner ≈ y712-785 @600px → local 237-262 (nudged up, see above)
+		info.position = Vector2(0, 231)
+		info.size = Vector2(cw, 25)
 		info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		info.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		card.add_child(info)
 	deal_cards = false
 

@@ -5,7 +5,7 @@ var hero: String = "emmy"   # "emmy" or "isla"
 
 # currency + store upgrades (session-persistent; save file later)
 # GOLD (Emmy's decision): earned by defeating enemies + finding chests
-var gold: int = 0
+var gold: int = 9999   # TEMP unlimited testing money (Andy, 2026-08-29) — return to 0 for release
 var presents: int = 0
 var atk_bonus: int = 0      # added to attack-card power
 var heal_bonus: int = 0     # added to heal-card power
